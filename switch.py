@@ -55,16 +55,14 @@ class SimpleSwitch13(app_manager.RyuApp):
         n_buffers = ev.msg.n_buffers
         n_tables = ev.msg.n_tables
         capabilities = ev.msg.capabilities
-        actions = ev.msg.actions
-        ports = ev.msg.ports
+        
         
         # add all datapath info to the flow_list
         # log details 
 
-        flow_list.append({'timestamp': timestamp, 'datapath_id': datapath_id,
+        flow_list.append({'type':'SwitchFeatures','timestamp': timestamp, 'datapath_id': datapath_id,
                           'n_buffers': n_buffers, 'n_tables': n_tables,
-                          'capabilities': capabilities, 
-                          'actions': actions, 'ports': ports})
+                          'capabilities': capabilities})
         self.write_to_csv()
 
         # install table-miss flow entry
@@ -104,7 +102,7 @@ class SimpleSwitch13(app_manager.RyuApp):
                                     flags=ofp.OFPFF_SEND_FLOW_REM,
                                     match= match, instructions=inst)
 
-      flow_list.append({'timestamp': timestamp, 'datapath_id': datapath.id,
+      flow_list.append({'type':'FLOWMOD','timestamp': timestamp, 'datapath_id': datapath.id,
                           'match': mod.match, 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags,
                           'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout,
                           'priority': mod.priority, 'buffer_id': mod.buffer_id,
@@ -125,6 +123,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
+
         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
                                              actions)]
         mod = None
@@ -136,7 +135,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             mod = parser.OFPFlowMod(datapath=datapath, priority=priority,
                                     match=match, instructions=inst)
         
-        flow_list.append({'timestamp': timestamp, 'datapath_id': datapath.id,
+        flow_list.append({'type': 'FLOWMOD','timestamp': timestamp, 'datapath_id': datapath.id,
                           'match': mod.match, 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags,
                           'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout,
                           'priority': mod.priority, 'buffer_id': mod.buffer_id,
@@ -211,7 +210,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
                                   in_port=in_port, actions=actions, data=data)
                           
-        flow_list.append({'timestamp': timestamp,'datapath_id':datapath_id, 'buffer_id': buffer_id, 'data': data, 'in_port': in_port, 'total_len': total_len, 'reason': reason})
+        flow_list.append({'type':'PACKETIN','timestamp': timestamp,'datapath_id':datapath_id, 'buffer_id': buffer_id, 'data': data, 'in_port': in_port, 'total_len': total_len, 'reason': reason})
         datapath.send_msg(out)
 
     @set_ev_cls(ofp_event.EventOFPFlowRemoved, MAIN_DISPATCHER)
@@ -241,7 +240,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             reason = 'GROUP DELETE'
         else:
             reason = 'unknown'
-        flow_list.append({'timestamp': timestamp, 'datapath_id': datapath_id, 'match': match, 'cookie': cookie, 'priority': priority, 'duration_sec': duration_sec, 'duration_nsec': duration_nsec, 'idle_timeout': idle_timeout, 'packet_count': packet_count, 'byte_count': byte_count, 'reason': reason})
+        flow_list.append({'type':'FLOWREMOVED','timestamp': timestamp, 'datapath_id': datapath_id, 'match': match, 'cookie': cookie, 'priority': priority, 'duration_sec': duration_sec, 'duration_nsec': duration_nsec, 'idle_timeout': idle_timeout, 'packet_count': packet_count, 'byte_count': byte_count, 'reason': reason})
         self.write_to_csv()
         
     
@@ -264,7 +263,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             reason = 'OFPET_PORT_MOD_FAILED'
         else:
             reason = 'OFPET_QUEUE_OP_FAILED'
-        flow_list.append({'timestamp': ev.timestamp, 'datapath_id': dp.id, 'data': data, 'reason': reason})
+        flow_list.append({'type':'ERROR','timestamp': ev.timestamp, 'datapath_id': dp.id, 'data': data, 'reason': reason})
 
 
     @set_ev_cls(ofp_event.EventOFPStatsReply, MAIN_DISPATCHER)
