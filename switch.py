@@ -12,7 +12,7 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import time
 from ryu.base import app_manager
 from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, HANDSHAKE_DISPATCHER
@@ -34,6 +34,12 @@ def write_logs(batch_number, logs):
     with open(filename, mode='w') as file:
         for log in logs:
             file.write(str(log)+ '\n')
+
+def write_file(logs):
+    filename = "logger.txt"
+    with open(filename, mode='w') as file:
+        for log in logs:
+            file.write(str(log))
 
     
 class SimpleSwitch13(app_manager.RyuApp):
@@ -63,6 +69,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         flow_list.append({'type':'SwitchFeatures','timestamp': timestamp, 'datapath_id': datapath_id,
                           'n_buffers': n_buffers, 'n_tables': n_tables,
                           'capabilities': capabilities})
+        #write_file({'type':'SwitchFeatures','timestamp': timestamp, 'datapath_id': datapath_id,'n_buffers': n_buffers, 'n_tables': n_tables,'capabilities': capabilities})
         self.write_to_csv()
 
         # install table-miss flow entry
@@ -107,6 +114,7 @@ class SimpleSwitch13(app_manager.RyuApp):
                           'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout,
                           'priority': mod.priority, 'buffer_id': mod.buffer_id,
                           'out_port': mod.out_port})
+      #write_file({'type':'FLOWMOD','timestamp': timestamp, 'datapath_id': datapath.id,'match': mod.match, 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags,'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout,'priority': mod.priority, 'buffer_id': mod.buffer_id,'out_port': mod.out_port})
    
                                 
       datapath.send_msg(mod)
@@ -115,6 +123,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         global batch_number, flow_list
         if len(flow_list)>10:
             write_logs(batch_number, flow_list)
+            #write_file(flow_list)
             batch_number += 1
             flow_list = []
     
@@ -211,6 +220,7 @@ class SimpleSwitch13(app_manager.RyuApp):
                                   in_port=in_port, actions=actions, data=data)
                           
         flow_list.append({'type':'PACKETIN','timestamp': timestamp,'datapath_id':datapath_id, 'buffer_id': buffer_id, 'data': data, 'in_port': in_port, 'total_len': total_len, 'reason': reason})
+        #write_file({'type':'PACKETIN','timestamp': timestamp,'datapath_id':datapath_id, 'buffer_id': buffer_id, 'data': data, 'in_port': in_port, 'total_len': total_len, 'reason': reason})
         datapath.send_msg(out)
 
     @set_ev_cls(ofp_event.EventOFPFlowRemoved, MAIN_DISPATCHER)
@@ -241,6 +251,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         else:
             reason = 'unknown'
         flow_list.append({'type':'FLOWREMOVED','timestamp': timestamp, 'datapath_id': datapath_id, 'match': match, 'cookie': cookie, 'priority': priority, 'duration_sec': duration_sec, 'duration_nsec': duration_nsec, 'idle_timeout': idle_timeout, 'packet_count': packet_count, 'byte_count': byte_count, 'reason': reason})
+        #write_file({'type':'FLOWREMOVED','timestamp': timestamp, 'datapath_id': datapath_id, 'match': match, 'cookie': cookie, 'priority': priority, 'duration_sec': duration_sec, 'duration_nsec': duration_nsec, 'idle_timeout': idle_timeout, 'packet_count': packet_count, 'byte_count': byte_count, 'reason': reason})
         self.write_to_csv()
         
     
@@ -264,6 +275,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         else:
             reason = 'OFPET_QUEUE_OP_FAILED'
         flow_list.append({'type':'ERROR','timestamp': ev.timestamp, 'datapath_id': dp.id, 'data': data, 'reason': reason})
+        #write_file({'type':'ERROR','timestamp': ev.timestamp, 'datapath_id': dp.id, 'data': data, 'reason': reason})
 
 
     @set_ev_cls(ofp_event.EventOFPStatsReply, MAIN_DISPATCHER)
@@ -291,3 +303,135 @@ class SimpleSwitch13(app_manager.RyuApp):
                         stat.cookie, stat.packet_count, stat.byte_count,
                         stat.match, stat.instructions))
         self.logger.debug('FlowStats: %s', flows)
+        #write_file(str('FlowStats: %s', flows))
+    
+    # it may send OFPPC_NO_PACKET_IN when table is full ?
+    def _send_port_mod(self, dp, config, mask):
+        p = self.get_port(dp)
+        if not p:
+            err = 'need attached port to switch.'
+            self.results[self.current] = err
+            self.start_next_test(dp)
+            return
+
+        self._verify = [p.port_no, config & mask]
+        m = dp.ofproto_parser.OFPPortMod(dp, p.port_no, p.hw_addr,
+                                         config, mask, 0)
+        dp.send_msg(m)
+        dp.send_barrier()
+
+        # TODO: waiting to port UP|DOWN.
+        time.sleep(1)
+        m = dp.ofproto_parser.OFPFeaturesRequest(dp)
+        print("Checkk! for table_full")
+        print(f"Flow removed from datapath {dp.id}, message: {m}")
+        #write_file(f"Flow removed from datapath {dp.id}, message: {m}")
+        dp.send_msg(m)
+
+    #for sending stat req, then listen it
+    def send_flow_stats_request(self, datapath):
+        ofp = datapath.ofproto
+        ofp_parser = datapath.ofproto_parser
+
+        cookie = cookie_mask = 0
+        match = ofp_parser.OFPMatch(in_port=1)
+        req = ofp_parser.OFPFlowStatsRequest(datapath, 0,
+                                            ofp.OFPTT_ALL,
+                                            ofp.OFPP_ANY, ofp.OFPG_ANY,
+                                            cookie, cookie_mask,
+                                            match)
+        datapath.send_msg(req)
+
+
+
+
+    def send_aggregate_stats_request(self, datapath):
+        ofp = datapath.ofproto
+        ofp_parser = datapath.ofproto_parser
+
+        cookie = cookie_mask = 0
+        match = ofp_parser.OFPMatch(in_port=1)
+        req = ofp_parser.OFPAggregateStatsRequest(datapath, 0,
+                                                ofp.OFPTT_ALL,
+                                                ofp.OFPP_ANY,
+                                                ofp.OFPG_ANY,
+                                                cookie, cookie_mask,
+                                                match)
+        datapath.send_msg(req)
+        
+    @set_ev_cls(ofp_event.EventOFPAggregateStatsReply, MAIN_DISPATCHER)
+    def aggregate_stats_reply_handler(self, ev):
+        body = ev.msg.body
+
+        self.logger.debug('AggregateStats: packet_count=%d byte_count=%d '
+                        'flow_count=%d',
+                        body.packet_count, body.byte_count,
+                        body.flow_count)
+        print(f"AggregateStats: packet_count={body.packet_count} byte_count={body.byte_count} flow_count={body.flow_count}'")
+        #write_file(f"AggregateStats: packet_count={body.packet_count} byte_count={body.byte_count} flow_count={body.flow_count}'")
+        
+    """
+        {
+    "OFPAggregateStatsReply": {
+        "body": {
+            "OFPAggregateStats": {
+                "byte_count": 574, 
+                "flow_count": 6, 
+                "packet_count": 7
+            }
+        }, 
+        "flags": 0, 
+        "type": 2
+    }
+    }
+    """
+
+    #try to send post request from postman, listen and log it here:
+    @set_ev_cls(ofp_event.EventOFPTableStatsReply, MAIN_DISPATCHER)
+    def table_stats_reply_handler(self, ev):
+        tables = []
+        for stat in ev.msg.body:
+            tables.append('table_id=%d active_count=%d lookup_count=%d '
+                        ' matched_count=%d' %
+                        (stat.table_id, stat.active_count,
+                        stat.lookup_count, stat.matched_count))
+        self.logger.debug('TableStats: %s', tables)
+        print(f"AggregateStats: table_id={stat.table_id} active_count={stat.active_count} lookup_count={stat.lookup_count} matched_count={stat.matched_count}")
+        #write_file(f"AggregateStats: table_id={stat.table_id} active_count={stat.active_count} lookup_count={stat.lookup_count} matched_count={stat.matched_count}")
+
+    
+
+    @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
+    def port_stats_reply_handler(self, ev):
+        ports = []
+        for stat in ev.msg.body:
+            ports.append('port_no=%d '
+                        'rx_packets=%d tx_packets=%d '
+                        'rx_bytes=%d tx_bytes=%d '
+                        'rx_dropped=%d tx_dropped=%d '
+                        'rx_errors=%d tx_errors=%d '
+                        'rx_frame_err=%d rx_over_err=%d rx_crc_err=%d '
+                        'collisions=%d duration_sec=%d duration_nsec=%d' %
+                        (stat.port_no,
+                        stat.rx_packets, stat.tx_packets,
+                        stat.rx_bytes, stat.tx_bytes,
+                        stat.rx_dropped, stat.tx_dropped,
+                        stat.rx_errors, stat.tx_errors,
+                        stat.rx_frame_err, stat.rx_over_err,
+                        stat.rx_crc_err, stat.collisions,
+                        stat.duration_sec, stat.duration_nsec))
+        self.logger.debug('PortStats: %s', ports)
+        #write_file(str('PortStats: %s', ports))
+
+    @set_ev_cls(ofp_event.EventOFPAggregateStatsReply, MAIN_DISPATCHER)
+    def aggregate_stats_reply_handler(self, ev):
+        body = ev.msg.body
+
+        self.logger.debug('AggregateStats: packet_count=%d byte_count=%d '
+                        'flow_count=%d',
+                        body.packet_count, body.byte_count,
+                        body.flow_count)
+        #write_file('AggregateStats: packet_count=%d byte_count=%d ''flow_count=%d',body.packet_count, body.byte_count,body.flow_count)
+
+
+    

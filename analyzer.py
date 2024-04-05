@@ -8,7 +8,7 @@ def read_logs():
   with open('logs.txt', 'r') as file:
       # each line in the file is a dictionary, create a array of dict from the file
       for line in file:
-          # split string with , 
+          # split string with ,
           line = line.split(',')
           # create a dictionary from the string
           log = {}
