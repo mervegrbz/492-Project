@@ -1,0 +1,119 @@
+// Initialization Algorithm:
+Function InitializationAlgorithm()
+    flow_count = GetRequest("aggregateflow").flow_count
+    previous_flow_occupancy_rates = InitializeDeque(max_length = 20)
+    max_flow_count = GetRequest("stats").n_tables * GetRequest("stats").capabilities
+    storing_flows = InitializeList()
+
+// Prediction Algorithm:
+Function PredictionAlgorithm()
+    While True
+        If message is FLOW_REMOVED Then
+            flow_count = flow_count - 1
+        EndIf
+        If message is PACKET_IN Then
+            flow_count = flow_count + 1
+            Add Flow(params) to storing_flows
+            If CheckFlowThreshold(flow_count) Then
+                Call DetectionAlgorithm()
+            EndIf
+        EndIf
+        Call PeriodicCheck() every 10 seconds using a timer
+
+Function PeriodicCheck()
+    occupancy_rate = flow_count / max_flow_count
+    If HighRateAttackPrediction(occupancy_rate) Then
+        Call DetectionAlgorithm()
+    EndIf
+    Reset timer to call PeriodicCheck after 10 seconds
+
+Function CheckFlowThreshold(flow_count)
+    If flow_count >= 0.8 * max_flow_count Then
+        Return True
+    Else
+        Return False
+    EndIf
+
+Function HighRateAttackPrediction(occupancy_rate)
+    Append occupancy_rate to previous_flow_occupancy_rates
+    If Length of previous_flow_occupancy_rates > 1 Then
+        flow_rates_difference = Last item of previous_flow_occupancy_rates - Second last item of previous_flow_occupancy_rates
+        If flow_rates_difference >= 0.1 Then  // Checking for a change of 10% or more
+            Return True
+        EndIf
+    EndIf
+    Return False
+
+// Detection Algorithm:
+Function DetectionAlgorithm()
+    mean_time, variation_time = CalculateTimeStatistics()
+    bytes, packets = CalculateBytesAndPacketCounts()
+    If ML_DetectionAlgorithm(mean_time, variation_time, bytes, packets, flow_count) Then
+        Call MitigationAlgorithm()
+    EndIf
+
+Function CalculateTimeStatistics()
+    flows = GetRequest("table_stats")
+    Initialize times as an empty list
+    For each flow in flows
+        Append (current_time - flow.time) to times
+    EndFor
+    Return mean(times), standard_deviation(times)
+
+Function CalculateBytesAndPacketCounts()
+    stats = GetRequest("aggregateflow")
+    Return stats.bytes, stats.packets
+
+// Mitigation Algorithm:
+Function MitigationAlgorithm()
+    Call GetMaliciousFlows()
+    Call MatchRemainingPackets()
+    entropy_port = CalculateEntropy("ports")
+    entropy_ip = CalculateEntropy("ips")
+    entropy_mac = CalculateEntropy("macs")
+    mean_packet_size = GetRequest("aggregateflow").bytes / GetRequest("aggregateflow").packets
+    mean_byte_time = GetMeanByteTime()
+    If ML_MitigationAlgorithm(mean_packet_size, mean_byte_time, entropy_port, entropy_ip, entropy_mac) Then
+        black_list = CreateBlacklist()
+        Call Block(black_list)
+    EndIf
+
+Function GetMaliciousFlows()
+    For i from 1 to 253
+        table_flows = GetRequest("stats/flow/" + i)
+        For each flow in table_flows
+            byte_per_packet = flow.bytes / flow.packets
+            If byte_per_packet < threshold Then
+                Append flow to malicious_flows
+            EndIf
+        EndFor
+    EndFor
+
+Function GetMeanByteTime()
+    Initialize byte_time_list as an empty list
+    For i from 1 to 253
+        table_flows = GetRequest("stats/flow/" + i)
+        For each flow in table_flows
+            If flow.duration_time != 0 Then
+                Append (flow.bytes / flow.duration_time) to byte_time_list
+            EndIf
+        EndFor
+    EndFor
+    If byte_time_list is not empty Then
+        Return mean(byte_time_list)
+    Else
+        Return 0
+    EndIf
+
+Function MatchRemainingPackets()
+    stats = GetFlowStats()
+    For each flow in storing_flows
+        If not (flow matches stats) Then
+            Delete flow from DB
+        EndIf
+    EndFor
+    For index from 0 to length of DB - 1
+        If (DB[index] in DB[index+1:]) Then
+            Delete DB[index] from DB
+        EndIf
+    EndFor
