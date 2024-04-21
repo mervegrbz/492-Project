@@ -19,9 +19,10 @@ from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, HANDSHAKE
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
-from ryu.lib.packet import ethernet, ipv4, tcp
+from ryu.lib.packet import ethernet, ipv4, tcp, udp, icmp, in_proto
 from ryu.lib.packet import ether_types
 from ryu import utils
+
 import switch_class
 
 import schedule
@@ -174,7 +175,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         else:
             reason = 'unknown'
         datapath_id = datapath.id
-
+        
         self.write_to_csv()
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocols(ethernet.ethernet)[0]
@@ -208,6 +209,37 @@ class SimpleSwitch13(app_manager.RyuApp):
             match = parser.OFPMatch(in_port=in_port, eth_dst=dst, eth_src=src)
             # verify if we have a valid buffer_id, if yes avoid to send both
             # flow_mod & packet_out
+            
+            if eth.ethertype == ether_types.ETH_TYPE_IP:
+                ip = pkt.get_protocol(ipv4.ipv4)
+                srcip = ip.src
+                dstip = ip.dst
+                protocol = ip.proto
+
+                # if ICMP Protocol
+                if protocol == in_proto.IPPROTO_ICMP:
+                    t = pkt.get_protocol(icmp.icmp)
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            ipv4_src=srcip, ipv4_dst=dstip,
+                                            ip_proto=protocol,icmpv4_code=t.code,
+                                            icmpv4_type=t.type)
+
+                #  if TCP Protocol
+                elif protocol == in_proto.IPPROTO_TCP:
+                    t = pkt.get_protocol(tcp.tcp)
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            ipv4_src=srcip, ipv4_dst=dstip,
+                                            ip_proto=protocol,
+                                            tcp_src=t.src_port, tcp_dst=t.dst_port,)
+
+                #  If UDP Protocol
+                elif protocol == in_proto.IPPROTO_UDP:
+                    u = pkt.get_protocol(udp.udp)
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            ipv4_src=srcip, ipv4_dst=dstip,
+                                            ip_proto=protocol,
+                                            udp_src=u.src_port, udp_dst=u.dst_port,)
+
             if msg.buffer_id != ofproto.OFP_NO_BUFFER:
                 self.logger.info(datapath)
                 self.send_flow_mod(datapath, timestamp, 1, match, actions, msg.buffer_id)
