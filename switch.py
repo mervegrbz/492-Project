@@ -28,6 +28,7 @@ import switch_class
 import schedule
 import csv
 flow_list = []
+
 batch_number = 0
 
 
@@ -61,20 +62,10 @@ class SimpleSwitch13(app_manager.RyuApp):
 
         switch = switch_class.Switch(timestamp, datapath_id, n_buffers, n_tables, capabilities)
         self.switch_list[datapath_id] = switch
-        
-        print(self.switch_list)
-        # add all datapath info to the flow_list
-        # log details
+    
         flow_list.append({'type':'SwitchFeatures','timestamp': timestamp, 'datapath_id': datapath_id,
                           'n_buffers': n_buffers, 'n_tables': n_tables, 'capabilities': capabilities})
-        self.write_to_csv()
-        # install table-miss flow entry
-        #
-        # We specify NO BUFFER to max_len of the output action due to
-        # OVS bug. At this moment, if we specify a lesser number, e.g.,
-        # 128, OVS will send Packet-In with invalid buffer_id and
-        # truncated packet data. In that case, we cannot output packets
-        # correctly.  The bug has been fixed in OVS v2.1.0.
+     
         match = parser.OFPMatch()
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
                                           ofproto.OFPCML_NO_BUFFER)]
@@ -114,15 +105,12 @@ class SimpleSwitch13(app_manager.RyuApp):
       switch = self.switch_list[datapath.id]
       switch.flow_mods += 1
       switch.flow_table.append(mod)                      
-      self.write_to_csv()
-
+   
     def write_to_csv(self):
         global batch_number, flow_list
-        if len(flow_list)>10:
-            write_logs(batch_number, flow_list)
-            batch_number += 1
-            flow_list = []
-    
+        write_logs(batch_number, flow_list)
+        
+
 
     def add_flow(self, datapath, timestamp, priority, match, actions, buffer_id=None):
         ofproto = datapath.ofproto
@@ -132,10 +120,11 @@ class SimpleSwitch13(app_manager.RyuApp):
         mod = None
         if buffer_id:
             mod = parser.OFPFlowMod(datapath=datapath, buffer_id=buffer_id,
+                                    flags=ofproto.OFPFF_SEND_FLOW_REM,
                                     priority=priority, match=match,
                                     instructions=inst) 
         else:
-            mod = parser.OFPFlowMod(datapath=datapath, priority=priority,
+            mod = parser.OFPFlowMod(datapath=datapath, priority=priority, flags=ofproto.OFPFF_SEND_FLOW_REM,         
                                     match=match, instructions=inst)
         flow_list.append({'type': 'FLOWMOD','timestamp': timestamp, 'datapath_id': datapath.id,
                           'match': mod.match, 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags,
@@ -176,11 +165,9 @@ class SimpleSwitch13(app_manager.RyuApp):
             reason = 'unknown'
         datapath_id = datapath.id
         
-        self.write_to_csv()
+       
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocols(ethernet.ethernet)[0]
-        # ip = pkt.get_protocols(ipv4.ipv4)[0]
-        # tcp = pkt.get_protocols(tcp.tcp)[0]
         flow_list.append({'type':'PACKETIN','timestamp': timestamp, 'datapath_id': datapath_id, 'in_port': in_port, 'reason': reason,
                           'eth_src': eth.src, 'eth_dst': eth.dst})
         switch = self.switch_list[datapath_id ]
@@ -203,7 +190,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             out_port = ofproto.OFPP_FLOOD
 
         actions = [parser.OFPActionOutput(out_port)]
-        self.write_to_csv()
+     
         # install a flow to avoid packet_in next time
         if out_port != ofproto.OFPP_FLOOD:
             match = parser.OFPMatch(in_port=in_port, eth_dst=dst, eth_src=src)
@@ -270,7 +257,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         idle_timeout = msg.idle_timeout
         packet_count = msg.packet_count
         byte_count = msg.byte_count
-      
+        self.write_to_csv()
         if msg.reason == ofp.OFPRR_IDLE_TIMEOUT:
             reason = 'IDLE TIMEOUT'
         elif msg.reason == ofp.OFPRR_HARD_TIMEOUT:
@@ -286,9 +273,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         switch = self.switch_list[datapath_id]
         switch.n_flow_removed += 1
         switch.flow_removed.append({'timestamp': timestamp, 'datapath_id': datapath_id, 'match': match, 'cookie': cookie, 'priority': priority, 'duration_sec': duration_sec, 'duration_nsec': duration_nsec, 'idle_timeout': idle_timeout, 'packet_count': packet_count, 'byte_count': byte_count, 'reason': reason})
-        
-        self.write_to_csv()
-        
+         
     
     @set_ev_cls(ofp_event.EventOFPErrorMsg,
             [HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER, MAIN_DISPATCHER])
@@ -297,29 +282,46 @@ class SimpleSwitch13(app_manager.RyuApp):
         msg = ev.msg
         dp = msg.datapath
         data = msg.data
-        if msg.reason == dp.ofproto.OFPET_HELLO_FAILED:
+        error_type = msg.type
+        error_code = msg.code
+        error_data = msg.data
+        
+        if msg.type == dp.ofproto.OFPET_HELLO_FAILED:
             reason = 'OFPET_HELLO_FAILED'
-        elif msg.reason == dp.ofproto.OFPET_BAD_REQUEST:
+        elif msg.type == dp.ofproto.OFPET_BAD_REQUEST:
             reason = 'OFPET_BAD_REQUEST'
-        elif msg.reason == dp.ofproto.OFPET_BAD_ACTION:
+        elif msg.type == dp.ofproto.OFPET_BAD_ACTION:
             reason = 'OFPET_BAD_ACTION'
-        elif msg.reason == dp.ofproto.OFPET_FLOW_MOD_FAILED:
+        elif msg.type == dp.ofproto.OFPET_FLOW_MOD_FAILED:
             reason = 'OFPET_FLOW_MOD_FAILED'
-        elif msg.reason == dp.ofproto.OFPET_PORT_MOD_FAILED:
+        elif msg.type == dp.ofproto.OFPET_PORT_MOD_FAILED:
             reason = 'OFPET_PORT_MOD_FAILED'
         else:
             reason = 'OFPET_QUEUE_OP_FAILED'
-        decoded = packet.Packet(data)
-        pkt = packet.Packet(data)
-        for p in pkt.protocols:
-            print(p)
-        eth = decoded.get_protocol(ethernet.ethernet)[0]
-        # ip = decoded.get_protocol(ipv4.ipv4)[0]
-        # TCP = decoded.get_protocol(tcp.tcp)[0] 
+        pkt = packet.Packet(msg.data)
+        eth = pkt.get_protocols(ethernet.ethernet)[0]
+        if eth.ethertype == ether_types.ETH_TYPE_IP:
+            ip = pkt.get_protocol(ipv4.ipv4)
+            dest = 0
+            srcip = ip.src
+            dstip = ip.dst
+            protocol = ip.proto
+            if protocol == in_proto.IPPROTO_ICMP:
+                dest = pkt.get_protocol(icmp.icmp)
+                
+            elif protocol == in_proto.IPPROTO_TCP:
+                dest = pkt.get_protocol(tcp.tcp)
+                
+            #  If UDP Protocol
+            elif protocol == in_proto.IPPROTO_UDP:
+                dest = pkt.get_protocol(udp.udp)
 
         
-        flow_list.append({'type':'ERROR','timestamp': ev.timestamp, 'datapath_id': dp.id, 'reason': reason,
-                           'eth_src': eth.src, 'eth_dst': eth.dst})
+            flow_list.append({'type':'ERROR','timestamp': ev.timestamp, 'datapath_id': dp.id, 'reason': reason,
+                            'eth_src': eth.src, 'eth_dst': eth.dst, "ipv4_dst": dstip, "ipv4_src": srcip, "protocol": protocol, "dest": dest})
+        else:
+            flow_list.append({'type':'ERROR','timestamp': ev.timestamp, 'datapath_id': dp.id, 'reason': reason,
+                            'eth_src': eth.src, 'eth_dst': eth.dst})
 
 
 
@@ -348,3 +350,4 @@ class SimpleSwitch13(app_manager.RyuApp):
                         stat.cookie, stat.packet_count, stat.byte_count,
                         stat.match, stat.instructions))
         self.logger.debug('FlowStats: %s', flows)
+
