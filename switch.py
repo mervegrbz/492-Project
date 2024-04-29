@@ -163,6 +163,10 @@ class SimpleSwitch13(app_manager.RyuApp):
 		flow_list.append({'type': 'PACKETIN', 'timestamp': timestamp, 'datapath_id': datapath_id, 'in_port': in_port, 'reason': reason, 'eth_src': eth.src, 'eth_dst': eth.dst})
 		switch = self.switch_list[datapath_id]
 		switch.n_packet_in += 1
+		# we should add this also the switch's packet_ins as:
+		# packet_in_flow = {'type': 'PACKETIN', 'timestamp': timestamp, 'datapath_id': datapath_id, 'in_port': in_port, 'reason': reason, 'eth_src': eth.src, 'eth_dst': eth.dst}
+		#flow_list.append(packet_in_flow)
+		#switch.packet_ins.append(packet_in_flow)
 
 		if eth.ethertype == ether_types.ETH_TYPE_LLDP:
 			return
@@ -330,6 +334,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 		datapath.send_msg(req)
 
 	# when responses comes from switches after sending flow stats request, this function will be triggered
+	# we should use it to whether our flow_count and real flow count is match by calling it in 20 sec i.e.
 	@set_ev_cls(ofp_event.EventOFPAggregateStatsReply, MAIN_DISPATCHER)
 	def aggregate_stats_reply_handler(self, ev):
 		"""{
