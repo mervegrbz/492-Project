@@ -71,9 +71,8 @@ class Switch:
 			overload_time = time.time()
 			self.overload_timestamps.append(overload_time)
 			print("Switch %s is overloaded" % self.datapath_id)
-		#TODO is it ok?
-		#current_occupancy_rate = OccupancyRate(used_capacity / self.capacity,time.time())
-		#self.occupancy_rates.append(current_occupancy_rate)
+		current_occupancy_rate = OccupancyRate(used_capacity / self.capacity,time.time())
+		self.occupancy_rates.append(current_occupancy_rate)
 		return used_capacity / self.capacity
 
 	# this function calculates the statistics from removed flows. 

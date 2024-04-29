@@ -73,7 +73,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 			match = parser.OFPMatch()
 			actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
 			# why don't we send_flow_mod as we did in packet_in_handler?
-			self.add_flow(datapath, timestamp, 0, match, actions)
+			self.add_flow(datapath, timestamp, 0, match, actions) #switch saves itselves without idle, hard timeout
 
 	# when flow mod sending from controller to the switch, it will trigger this function
   	# When packet_in message comes from switch to the controller, controller send back a flow_mod message with OFPFC_ADD command.
@@ -84,6 +84,8 @@ class SimpleSwitch13(app_manager.RyuApp):
 			idle_timeout = 10
 			inst = [ofp_parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS, actions)]
 			mod = None
+			in_port = match['in_port']
+			print("In_port: " + str(in_port)) #TODO whether it works
 			if (buffer_id):
 				mod = ofp_parser.OFPFlowMod(datapath, cookie=0, cookie_mask=0, table_id=0, command=ofp.OFPFC_ADD,
 																		idle_timeout=idle_timeout, hard_timeout=0,priority=priority, buffer_id=buffer_id,
@@ -99,6 +101,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 												'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout,
 												'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port})
 			datapath.send_msg(mod)
+			#TODO in_port dene matchin içinden
 			# get the switch from switch_list from corresponding datapath_id, increment flow_mod, update the flow table
 			switch = self.switch_list[datapath.id]
 			switch.flow_mods += 1
@@ -248,8 +251,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 		flow_list.append(flow_removed_details)
 		switch = self.switch_list[datapath_id]
 		switch.n_flow_removed += 1
-		# Instead of switch_class.FLOW_OPERATION.ADD, it should be switch_class.FLOW_OPERATION.DELETE I think
-		switch.update_flow_table({k: v for k, v in flow_removed_details.items() if k != 'type'}, switch_class.FLOW_OPERATION.ADD)
+		switch.update_flow_table({k: v for k, v in flow_removed_details.items() if k != 'type'}, switch_class.FLOW_OPERATION.DELETE)
 		switch.flow_removed.append({k: v for k, v in flow_removed_details.items() if k != 'type'})
 
 	# This function will trigger whenever an error messages comes into the controller
