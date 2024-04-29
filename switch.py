@@ -31,6 +31,7 @@ flow_list = []
 
 batch_number = 0
 
+# writing logs into the file w.r.t batch number after that it will convert it to csv in analyzer class
 def write_logs(batch_number, logs):
     filename = f"log_batch_{batch_number}.txt"
     with open(filename, mode='w') as file:
@@ -38,6 +39,7 @@ def write_logs(batch_number, logs):
 
             file.write(str(log) + '\n')
 
+# a simple switch class from OpenFlow 1.3 documentation (https://github.com/faucetsdn/ryu/blob/master/ryu/app/simple_switch_13.py)
 class SimpleSwitch13(app_manager.RyuApp):
 	OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
@@ -46,6 +48,8 @@ class SimpleSwitch13(app_manager.RyuApp):
 			self.mac_to_port = {}
 			self.switch_list = {}
 
+	# when switch features comes to the controller, it will append its some features into the flow_list which we will use in our csv files
+	# you can check for this link for following handler classes https://ryu.readthedocs.io/en/latest/ofproto_v1_3_ref.html
 	@set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
 	def switch_features_handler(self, ev):
 			global flow_list
@@ -60,16 +64,20 @@ class SimpleSwitch13(app_manager.RyuApp):
 
 			switch = switch_class.Switch(
 					timestamp, datapath_id, n_buffers, n_tables, capabilities)
+			# adding switch to the switch list with its datapath_id
 			self.switch_list[datapath_id] = switch
 
 			flow_list.append({'type': 'SwitchFeatures', 'timestamp': timestamp, 'datapath_id': datapath_id,
 												'n_buffers': n_buffers, 'n_tables': n_tables, 'capabilities': capabilities})
 
 			match = parser.OFPMatch()
-			actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
-																				ofproto.OFPCML_NO_BUFFER)]
+			actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
+			# why don't we send_flow_mod as we did in packet_in_handler?
 			self.add_flow(datapath, timestamp, 0, match, actions)
 
+	# when flow mod sending from controller to the switch, it will trigger this function
+  	# When packet_in message comes from switch to the controller, controller send back a flow_mod message with OFPFC_ADD command.
+    # Other commands, need an external intervention to the controller
 	def send_flow_mod(self, datapath, timestamp, match, actions, priority, buffer_id=None):
 			ofp = datapath.ofproto
 			ofp_parser = datapath.ofproto_parser
@@ -91,14 +99,18 @@ class SimpleSwitch13(app_manager.RyuApp):
 												'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout,
 												'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port})
 			datapath.send_msg(mod)
+			# get the switch from switch_list from corresponding datapath_id, increment flow_mod, update the flow table
 			switch = self.switch_list[datapath.id]
 			switch.flow_mods += 1
 			switch.update_flow_table(mod, switch_class.FLOW_OPERATION.ADD)
 
+	# writing logs
 	def write_to_csv(self):
 			global batch_number, flow_list
 			write_logs(batch_number, flow_list)
 
+	# When switch features comes to the controller (it comes when there is a new switch), a first flow append to the table
+	# We also append this to our flow_list to follow them
 	def add_flow(self, datapath, timestamp, priority, match, actions, buffer_id=None):
 			ofproto = datapath.ofproto
 			parser = datapath.ofproto_parser
@@ -112,11 +124,14 @@ class SimpleSwitch13(app_manager.RyuApp):
 												'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout,
 												'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port})
 
+			# get the switch from switch_list from corresponding datapath_id, increment flow_mod, update the flow table
 			switch = self.switch_list[datapath.id]
 			switch.flow_mods += 1
 			switch.update_flow_table(mod, switch_class.FLOW_OPERATION.ADD)
 			datapath.send_msg(mod)
 
+	# When packet_in async messages comes from switch to the controller, it will trigger this function
+	
 	@set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
 	def _packet_in_handler(self, ev):
 		global flow_list
@@ -139,8 +154,12 @@ class SimpleSwitch13(app_manager.RyuApp):
 			reason = 'INVALID TTL'
 		else:
 			reason = 'unknown'
+
+		
 		pkt = packet.Packet(msg.data)
 		eth = pkt.get_protocols(ethernet.ethernet)[0]
+
+		# add this to our csv file and increment packet_in count
 		flow_list.append({'type': 'PACKETIN', 'timestamp': timestamp, 'datapath_id': datapath_id, 'in_port': in_port, 'reason': reason, 'eth_src': eth.src, 'eth_dst': eth.dst})
 		switch = self.switch_list[datapath_id]
 		switch.n_packet_in += 1
@@ -154,13 +173,17 @@ class SimpleSwitch13(app_manager.RyuApp):
 		self.mac_to_port.setdefault(dpid, {})
 		self.mac_to_port[dpid][src] = in_port
 
+		# if destionation mac has port before out_port should be this, else append new from ofproto
 		if dst in self.mac_to_port[dpid]:
 			out_port = self.mac_to_port[dpid][dst]
 		else:
 			out_port = ofproto.OFPP_FLOOD
 		actions = [parser.OFPActionOutput(out_port)]
+
+		# when outport was defined before ? 
 		# install a flow to avoid packet_in next time
 		if out_port != ofproto.OFPP_FLOOD:
+			# get its protocol, and arranging match w.r.t its protocol (tcp, udp, icmp)
 			if eth.ethertype == ether_types.ETH_TYPE_IP:
 				ip = pkt.get_protocol(ipv4.ipv4)
 				srcip = ip.src
@@ -188,6 +211,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 		out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id, in_port=in_port, actions=actions, data=data)
 		datapath.send_msg(out)
 
+	# this function will trigger whenever controller sends it will remove the flow with a reason
 	@set_ev_cls(ofp_event.EventOFPFlowRemoved, MAIN_DISPATCHER)
 	def flow_removed_handler(self, ev):
 		global flow_list
@@ -215,13 +239,16 @@ class SimpleSwitch13(app_manager.RyuApp):
 			reason = 'GROUP DELETE'
 		else:
 			reason = 'unknown'
+		# add this message into csv, increase n_removed_flows, update the flow table and add flow_removed to this flow
 		flow_removed_details = {'type': 'FLOWREMOVED', 'timestamp': timestamp, 'datapath_id': datapath_id, 'match': match, 'cookie': cookie, 'priority': priority,'duration_sec': duration_sec, 'duration_nsec': duration_nsec, 'idle_timeout': idle_timeout, 'packet_count': packet_count, 'byte_count': byte_count, 'reason': reason}
 		flow_list.append(flow_removed_details)
 		switch = self.switch_list[datapath_id]
 		switch.n_flow_removed += 1
+		# Instead of switch_class.FLOW_OPERATION.ADD, it should be switch_class.FLOW_OPERATION.DELETE I think
 		switch.update_flow_table({k: v for k, v in flow_removed_details.items() if k != 'type'}, switch_class.FLOW_OPERATION.ADD)
 		switch.flow_removed.append({k: v for k, v in flow_removed_details.items() if k != 'type'})
 
+	# This function will trigger whenever an error messages comes into the controller
 	@set_ev_cls(ofp_event.EventOFPErrorMsg, [HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER, MAIN_DISPATCHER])
 	def error_msg_handler(self, ev):
 		global flow_list
@@ -245,6 +272,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 		eth = pkt.get_protocols(ethernet.ethernet)[0]
 		flow_list.append({'type': 'ERROR', 'timestamp': ev.timestamp, 'datapath_id': dp.id, 'reason': reason, 'eth_src': eth.src, 'eth_dst': eth.dst, "data": error_data, "error_code": error_code})
 
+	# this will trigger when EventOFPStatsReply comes? 
 	@set_ev_cls(ofp_event.EventOFPStatsReply, MAIN_DISPATCHER)
 	def stats_reply_handler(self, ev):
 		msg = ev.msg
@@ -254,6 +282,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 		if msg.type == ofp.OFPST_FLOW:
 			self.flow_stats_reply_handler(body)
 
+	# when responses comes from switches after sending flow stats request, this function will be triggered
 	def flow_stats_reply_handler(self, body):
 		flows = []
 		for stat in body:
@@ -270,3 +299,56 @@ class SimpleSwitch13(app_manager.RyuApp):
 											stat.cookie, stat.packet_count, stat.byte_count,
 											stat.match, stat.instructions))
 		self.logger.debug('FlowStats: %s', flows)
+
+	# this will send flow stats request to the switches (it will used in getting requests at detection)
+	def send_flow_stats_request(self, datapath):
+		ofp = datapath.ofproto
+		ofp_parser = datapath.ofproto_parser
+
+		cookie = cookie_mask = 0
+		match = ofp_parser.OFPMatch(in_port=1)
+		req = ofp_parser.OFPFlowStatsRequest(datapath, 0,
+											ofp.OFPTT_ALL,
+											ofp.OFPP_ANY, ofp.OFPG_ANY,
+											cookie, cookie_mask,
+											match)
+		datapath.send_msg(req)
+
+	# this will send aggregate stats request to the switches (they will response as the sum of their flow tables)
+	def send_aggregate_stats_request(self, datapath):
+		ofp = datapath.ofproto
+		ofp_parser = datapath.ofproto_parser
+
+		cookie = cookie_mask = 0
+		match = ofp_parser.OFPMatch(in_port=1)
+		req = ofp_parser.OFPAggregateStatsRequest(datapath, 0,
+												ofp.OFPTT_ALL,
+												ofp.OFPP_ANY,
+												ofp.OFPG_ANY,
+												cookie, cookie_mask,
+												match)
+		datapath.send_msg(req)
+
+	# when responses comes from switches after sending flow stats request, this function will be triggered
+	@set_ev_cls(ofp_event.EventOFPAggregateStatsReply, MAIN_DISPATCHER)
+	def aggregate_stats_reply_handler(self, ev):
+		"""{
+		"OFPAggregateStatsReply": {
+			"body": {
+				"OFPAggregateStats": {
+					"byte_count": 574, 
+					"flow_count": 6, 
+					"packet_count": 7
+				}
+			}, 
+			"flags": 0, 
+			"type": 2
+		}
+		}"""
+		body = ev.msg.body
+
+		self.logger.debug('AggregateStats: packet_count=%d byte_count=%d '
+						'flow_count=%d',
+						body.packet_count, body.byte_count,
+						body.flow_count)
+	
