@@ -86,36 +86,34 @@ class SimpleSwitch13(app_manager.RyuApp):
 																		priority=priority, out_port=ofp.OFPP_ANY, out_group=ofp.OFPG_ANY,
 																		flags=ofp.OFPFF_SEND_FLOW_REM, match=match, instructions=inst)
     					
-			flow_list.append({'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id,
+			flow_mod = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id,
 												'match': mod.match, 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags,
 												'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout,
-												'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port})
+												'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port}
 			datapath.send_msg(mod)
 			switch = self.switch_list[datapath.id]
-			switch.flow_mods += 1
-			switch.update_flow_table(mod, switch_class.FLOW_OPERATION.ADD)
+			# switch.flow_mods += 1
+			# switch.update_flow_table({k: v for k, v in flow_mod.items() if k != 'type'}, switch_class.FLOW_OPERATION.ADD)
 
 	def write_to_csv(self):
 			global batch_number, flow_list
 			write_logs(batch_number, flow_list)
 
 	def add_flow(self, datapath, timestamp, priority, match, actions, buffer_id=None):
-			ofproto = datapath.ofproto
-			parser = datapath.ofproto_parser
-			inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
-			mod = None
-			if buffer_id:
-				mod = parser.OFPFlowMod(datapath=datapath, buffer_id=buffer_id, flags=ofproto.OFPFF_SEND_FLOW_REM, priority=priority, match=match, instructions=inst)
-			else:
-				mod = parser.OFPFlowMod(datapath=datapath, priority=priority, flags=ofproto.OFPFF_SEND_FLOW_REM, match=match, instructions=inst)
-			flow_list.append({'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id, 'match': mod.match, 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags,
-												'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout,
-												'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port})
-
-			switch = self.switch_list[datapath.id]
-			switch.flow_mods += 1
-			switch.update_flow_table(mod, switch_class.FLOW_OPERATION.ADD)
-			datapath.send_msg(mod)
+		ofproto = datapath.ofproto
+		parser = datapath.ofproto_parser
+		inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
+		mod = None
+		if buffer_id:
+			mod = parser.OFPFlowMod(datapath=datapath, buffer_id=buffer_id, flags=ofproto.OFPFF_SEND_FLOW_REM, priority=priority, match=match, instructions=inst)
+		else:
+			mod = parser.OFPFlowMod(datapath=datapath, priority=priority, flags=ofproto.OFPFF_SEND_FLOW_REM, match=match, instructions=inst)
+		flow_mod = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id, 'match': mod.match, 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags, 'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout, 'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port }
+		flow_list.append(flow_mod)
+		switch = self.switch_list[datapath.id]
+		switch.flow_mods += 1
+		switch.update_flow_table({k: v for k, v in flow_mod.items() if k != 'type'}, switch_class.FLOW_OPERATION.ADD)
+		datapath.send_msg(mod)
 
 	@set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
 	def _packet_in_handler(self, ev):

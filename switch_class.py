@@ -3,11 +3,11 @@ import time
 from enum import Enum
 import numpy as np
 import pandas as pd
+from apscheduler.schedulers.background import BackgroundScheduler
 
 UPPER_THRESHOLD_STD_DEV = 0.1
 MEAN_THRESHOLD = 0.1
 LOWER_THRESHOLD_STD_DEV = 0.01
-
 
 class FLOW_OPERATION(Enum):
 	ADD = 1
@@ -26,7 +26,7 @@ class Switch:
 	n_packet_in = 0
 	n_flow_removed = 0
 	flow_mods = 0
-	capacity = 0
+	capacity = 50
 	capabilities = 0
 	idle_timeout = 10
 	flow_average_duration = 0
@@ -45,6 +45,9 @@ class Switch:
 		self.packet_in_rates = []
 		columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet', 'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev', 'packet_in_diff_arr']
 		self.history_batches = pd.DataFrame(columns=columns)
+		self.scheduler = BackgroundScheduler()
+		self.scheduler.add_job(self.flow_table_stats, 'interval', seconds=5)
+		self.scheduler.start()
 
 	def calc_flow_stats(self):
 		# todo reason should be add
@@ -58,16 +61,17 @@ class Switch:
 	def calc_removed_flows(self):
 		average_duration = 0
 		average_byte_per_packet = 0
+			
 		# TODO get the last N elements of the removed flows to monitor change
 		for i in self.flow_removed:
-			duration_sec = i.duration_sec
-			reason = i.reason
-			byte_count = i.byte_count
-			packet_count = i.packet_count
-			average_byte_per_packet += byte_count/packet_count
+			duration_sec = i['duration_sec']
+			reason = i['reason']
+			byte_count = i['byte_count']
+			packet_count = i['packet_count']
+			average_byte_per_packet += byte_count/packet_count  if packet_count > 0 else 0
 			average_duration += duration_sec
-		self.flow_average_duration = average_duration/len(self.flow_removed)
-		self.flow_average_byte_per_packet = average_byte_per_packet / len(self.flow_removed)
+		flow_average_duration = average_duration/len(self.flow_removed) if (len(self.flow_removed)>0) else 0
+		flow_average_byte_per_packet = average_byte_per_packet / len(self.flow_removed) if (len(self.flow_removed)>0) else 0
 		return self.flow_average_duration, self.flow_average_byte_per_packet
 
 	def update_flow_table(self, flow, operation):
@@ -83,11 +87,12 @@ class Switch:
 
 	def inspect_flow_table(self):
 		total_duration = 0
+
 		##
 		for i in self.flow_table:
 			now = time.time()
-			total_duration += now - i.timestamp
-		average_duration = total_duration/len(self.flow_table)
+			total_duration += now - i['timestamp']
+		average_duration =   total_duration/len(self.flow_table) if len(self.flow_table) > 0 else 0
 		print("Average duration of flows in flow table is %s" % average_duration)
 		return average_duration
 
@@ -113,7 +118,7 @@ class Switch:
 		std_dev = np.std(diff_arr)
 		mean = np.mean(diff_arr)
 
-		self.packet_in_rates.append(len(self.packet_ins))
+		self.packet_in_rates.append(self.n_packet_in)
 
 		new_diff_arr = np.diff(self.packet_in_rates)
 		new_std_dev = np.std(new_diff_arr)
@@ -123,11 +128,19 @@ class Switch:
 			print("Mean threshold exceeded")
 			print('Packet_in too much')
 		return new_mean, new_std_dev, new_diff_arr
-	# This method may work every 5 seconds to keep track of the flow table
+
+	# This method may work every 5 seconds to keep track of the flow table 5sn
 	def flow_table_stats(self):
+
 		capacity_used = self.calc_flow_stats()
 		flow_average_duration, flow_average_byte_per_packet = self.calc_removed_flows()
 		average_flow_duration_on_table = self.inspect_flow_table()
 		mean, std_dev, diff_arr = self.packet_in_rates_calc()
-		self.history_batches.add([time.time(), capacity_used, flow_average_duration,
-															flow_average_byte_per_packet, average_flow_duration_on_table, mean, std_dev, diff_arr])
+		print(time.time(), capacity_used, flow_average_duration, flow_average_byte_per_packet, average_flow_duration_on_table, mean, std_dev, diff_arr)
+		self.history_batches.loc[len(self.history_batches)] = {'timestamp': time.time(), 'capacity_used': capacity_used, 'removed_flow_average_duration': flow_average_duration,
+																	'removed_flow_byte_per_packet': flow_average_byte_per_packet, 'average_flow_duration_on_table': average_flow_duration_on_table,
+																	'packet_in_mean': mean, 'packet_in_std_dev': std_dev, 'packet_in_diff_arr': diff_arr}
+		print(len(self.history_batches))
+		if(len(self.history_batches) > 15 ) : # write data to csv 
+			print(len(self.history_batches))
+			self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
