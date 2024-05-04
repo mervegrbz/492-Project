@@ -73,19 +73,16 @@ class SimpleSwitch13(app_manager.RyuApp):
 			match = parser.OFPMatch()
 			actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
 			# why don't we send_flow_mod as we did in packet_in_handler?
-			self.add_flow(datapath, timestamp, 0, match, actions) #switch saves itselves without idle, hard timeout
+			self.add_flow(datapath, timestamp, 0, match, actions) #switch saves itselves without idle, hard timeout therefore not used send_flow
 
-	# when flow mod sending from controller to the switch, it will trigger this function
-  	# When packet_in message comes from switch to the controller, controller send back a flow_mod message with OFPFC_ADD command.
-    # Other commands, need an external intervention to the controller
+	# It will called when packet_in message comes to the controller
 	def send_flow_mod(self, datapath, timestamp, match, actions, priority, buffer_id=None):
 			ofp = datapath.ofproto
 			ofp_parser = datapath.ofproto_parser
 			idle_timeout = 10
 			inst = [ofp_parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS, actions)]
 			mod = None
-			in_port = match['in_port']
-			print("In_port: " + str(in_port)) #TODO whether it works
+			#in_port = match['in_port'] doesn't work because of L4 we need to consider
 			if (buffer_id):
 				mod = ofp_parser.OFPFlowMod(datapath, cookie=0, cookie_mask=0, table_id=0, command=ofp.OFPFC_ADD,
 																		idle_timeout=idle_timeout, hard_timeout=0,priority=priority, buffer_id=buffer_id,
@@ -95,13 +92,13 @@ class SimpleSwitch13(app_manager.RyuApp):
 				mod = ofp_parser.OFPFlowMod(datapath, cookie=0, cookie_mask=0, table_id=0, command=ofp.OFPFC_ADD, idle_timeout=idle_timeout, hard_timeout=0,
 																		priority=priority, out_port=ofp.OFPP_ANY, out_group=ofp.OFPG_ANY,
 																		flags=ofp.OFPFF_SEND_FLOW_REM, match=match, instructions=inst)
-    					
-			flow_list.append({'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id,
+
+			appended = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id,
 												'match': mod.match, 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags,
 												'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout,
-												'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port})
+												'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port}
+			flow_list.append(appended)
 			datapath.send_msg(mod)
-			#TODO in_port dene matchin içinden
 			# get the switch from switch_list from corresponding datapath_id, increment flow_mod, update the flow table
 			switch = self.switch_list[datapath.id]
 			switch.flow_mods += 1

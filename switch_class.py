@@ -3,17 +3,14 @@ import time
 from enum import Enum
 import numpy as np
 import pandas as pd
-from dataclasses import dataclass
+
 
 UPPER_THRESHOLD_STD_DEV = 0.1
 MEAN_THRESHOLD = 0.1
 LOWER_THRESHOLD_STD_DEV = 0.01
 CAPACITY_THRESHOLD = 0.8
 
-@dataclass
-class OccupancyRate:
-    occupancy_rate: float
-    time: float
+
 
 # we may arrange it w.r.t official document https://ryu.readthedocs.io/en/latest/ofproto_v1_3_ref.html command enumaration
 '''
@@ -43,6 +40,7 @@ class Switch:
 	n_flow_removed = 0 #TODO  is it required? isn't it same with len(flow_removed)
 	flow_mods = 0 # number of added flows into the table (OFPFC_ADD)
 	capacity = 0
+	flow_id = 0 # this will help us to match packet_in and OFPFC_ADD messages, update the table correspondingly
 	capabilities = 0
 	idle_timeout = 10
 	flow_average_duration = 0
