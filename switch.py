@@ -101,8 +101,8 @@ class SimpleSwitch13(app_manager.RyuApp):
 			datapath.send_msg(mod)
 			# get the switch from switch_list from corresponding datapath_id, increment flow_mod, update the flow table
 			switch = self.switch_list[datapath.id]
-			switch.flow_mods += 1
-			switch.update_flow_table(mod, switch_class.FLOW_OPERATION.ADD)
+			# switch.flow_mods += 1
+			# switch.update_flow_table({k: v for k, v in flow_mod.items() if k != 'type'}, switch_class.FLOW_OPERATION.ADD)
 
 	# writing logs
 	def write_to_csv(self):
@@ -112,23 +112,20 @@ class SimpleSwitch13(app_manager.RyuApp):
 	# When switch features comes to the controller (it comes when there is a new switch), a first flow append to the table
 	# We also append this to our flow_list to follow them
 	def add_flow(self, datapath, timestamp, priority, match, actions, buffer_id=None):
-			ofproto = datapath.ofproto
-			parser = datapath.ofproto_parser
-			inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
-			mod = None
-			if buffer_id:
-				mod = parser.OFPFlowMod(datapath=datapath, buffer_id=buffer_id, flags=ofproto.OFPFF_SEND_FLOW_REM, priority=priority, match=match, instructions=inst)
-			else:
-				mod = parser.OFPFlowMod(datapath=datapath, priority=priority, flags=ofproto.OFPFF_SEND_FLOW_REM, match=match, instructions=inst)
-			flow_list.append({'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id, 'match': mod.match, 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags,
-												'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout,
-												'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port})
-
-			# get the switch from switch_list from corresponding datapath_id, increment flow_mod, update the flow table
-			switch = self.switch_list[datapath.id]
-			switch.flow_mods += 1
-			switch.update_flow_table(mod, switch_class.FLOW_OPERATION.ADD)
-			datapath.send_msg(mod)
+		ofproto = datapath.ofproto
+		parser = datapath.ofproto_parser
+		inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
+		mod = None
+		if buffer_id:
+			mod = parser.OFPFlowMod(datapath=datapath, buffer_id=buffer_id, flags=ofproto.OFPFF_SEND_FLOW_REM, priority=priority, match=match, instructions=inst)
+		else:
+			mod = parser.OFPFlowMod(datapath=datapath, priority=priority, flags=ofproto.OFPFF_SEND_FLOW_REM, match=match, instructions=inst)
+		flow_mod = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id, 'match': mod.match, 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags, 'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout, 'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port }
+		flow_list.append(flow_mod)
+		switch = self.switch_list[datapath.id]
+		switch.flow_mods += 1
+		switch.update_flow_table({k: v for k, v in flow_mod.items() if k != 'type'}, switch_class.FLOW_OPERATION.ADD)
+		datapath.send_msg(mod)
 
 	# When packet_in async messages comes from switch to the controller, it will trigger this function
 	
