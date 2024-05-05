@@ -3,6 +3,9 @@ import time
 from enum import Enum
 import numpy as np
 import pandas as pd
+import data_classes as data_model
+import detection as trigger
+import statistics
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
@@ -49,6 +52,8 @@ class Switch:
 	state = "Normal"
 	overload_timestamps = []
 	occupancy_rates = [] # occupancy_rate for comparing switch's occupancy in time accordingly
+	removed_flow_counts = [] # this is for comparing removed flow counts in time accordingly
+	packet_in_counts_in_sec = [] # this is for comparing packet in count in a sec to compare whether there is a high-rate attack
 	history_batches = pd.DataFrame()
 
 	def __init__(self, connection_time, datapath_id, n_buffers, n_tables, capabilities):
@@ -66,14 +71,15 @@ class Switch:
 
 	# this function calculates the flow's occupancy rate, if it is more than threshold -> it will add its time into the overload_timestamps
 	# returns the occupancy rate of the switch
-	def calc_flow_stats(self):
+	def calc_occupance_rate(self):
 		# TODO reason should be add
 		used_capacity = self.flow_mods - self.n_flow_removed # flow count of the switch
 		if ((used_capacity / self.capacity) > CAPACITY_THRESHOLD):
 			overload_time = time.time()
 			self.overload_timestamps.append(overload_time)
 			print("Switch %s is overloaded" % self.datapath_id)
-		current_occupancy_rate = OccupancyRate(used_capacity / self.capacity,time.time())
+	
+		current_occupancy_rate = data_model.OccupancyRate(used_capacity / self.capacity,time.time())
 		self.occupancy_rates.append(current_occupancy_rate)
 		return used_capacity / self.capacity
 
@@ -171,3 +177,134 @@ class Switch:
 		if(len(self.history_batches) > 15 ) : # write data to csv 
 			print(len(self.history_batches))
 			self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
+
+	# checks whether flow count exceed capacity 
+	# TODO convert it to length of flow_table if it works fine
+	def exceed_capacity(self):
+		isExceed = ((self.flow_mods + 1 - self.flow_removed)/self.capacity) > CAPACITY_THRESHOLD
+		if (isExceed):
+			trigger_detection = trigger.Detection(switch=self)
+		return isExceed
+	
+
+	# TODO flow_removed 0 mı yapmalıyız, ama o sırada gelen olursa kaydeder miyiz?
+	# it stores the cumulative number of removed flows to compare them later
+	def store_removed_flow_count(self):
+		removed_count_before = 0
+		if (len(self.removed_flow_counts) > 0):
+			removed_count_before = self.removed_flow_counts[-1].removed_count
+		
+		current_remove_count = self.n_flow_removed - removed_count_before
+		flow_removed_count = data_model.RemovedCount(removed_count=current_remove_count, time=time.time())
+		self.removed_flow_counts.append(flow_removed_count)
+
+
+	# it compares the previous occupancy rates, and if it observes occupancy rates increased properly it returns true
+	def check_previous_occupancy_rates(self):
+		if len(self.occupancy_rates) < 4:
+			return False  # Not enough data to compare
+		
+		# Calculate the differences between consecutive occupancy rates
+		differences = []
+		# do that for previous 4 occupancy rates
+		for i in range(len(self.occupancy_rates) - 5, len(self.occupancy_rates) - 1):
+			rate_difference = self.occupancy_rates[i+1].occupancy_rate - self.occupancy_rates[i].occupancy_rate
+			differences.append(rate_difference)
+
+		# Check for consistent or increasing trend in differences
+		last_diff = 0.0
+		for diff in differences:
+			# if occupancy rate increased and last occupancy rate and currents are close
+			if (diff > 0.01 and (diff - last_diff < 0.015 or diff - last_diff > 0.015)):
+				last_diff = diff  # No consistent increase
+			else:
+				return False
+			
+		# If we reached here, there is a consistent or increasing trend
+		return True
+
+	# compare the last 5 removed flow counts in the switch's mean and the last 20 counts of the switch
+	# if the last ones are smaller than mean - st.dev it returns true
+	def check_removed_flows(self):
+		
+		# Calculate the mean and standard deviation of all recorded removed flow counts
+		all_counts = [rc.removed_count for rc in self.removed_flow_counts]
+		mean_count = statistics.mean(all_counts)
+		st_dev = statistics.stdev(all_counts)
+		analysis_index = 20
+		last_indices = 5
+
+		# Assume not enough data to perform robust statistical analysis
+		compare_for_lately = False
+		if len(self.removed_flow_counts) > analysis_index:
+			compare_for_lately = True  
+
+
+		# Extract the last 4 removed flow counts
+		last_counts = [rc.removed_count for rc in self.removed_flow_counts[-last_indices:]]
+		print(last_counts)
+
+		# Check if all of last four are significantly below the mean and within one standard deviation
+		if all(x < mean_count - st_dev for x in last_counts):
+			if (compare_for_lately):
+				lately_counts = all_counts[-analysis_index:-last_indices]
+				lately_mean_count = statistics.mean(lately_counts)
+				lately_st_dev = statistics.stdev(lately_counts)
+				if (all(x < lately_mean_count - lately_st_dev for x in last_counts)):
+					return True
+				else:
+					return False
+			else:
+				return True  # The last four counts are significantly lower than typical values
+		
+		return False
+	
+	# TODO call for every sec
+	# if current packet_in_count in a sec exceed the threshold
+	def is_high_rate_attack(self):
+		
+		# this scenerio is for not removing the packet in count, if we will remove for optimize our system this should be changed
+		previous_packet_in_count = 0
+		if (len(self.packet_in_counts_in_sec) > 0):
+			previous_packet_in_count = self.packet_in_counts_in_sec[-1]
+
+		current_packet_in_count = len(self.packet_in_counts_in_sec) - previous_packet_in_count
+		
+		
+		# Calculate the mean and standard deviation of all recorded removed flow counts
+		all_counts = [count for count in self.packet_in_counts_in_sec]
+		mean_count = statistics.mean(all_counts)
+		st_dev = statistics.stdev(all_counts)
+		analysis_index = 10
+
+		# Assume not enough data to perform robust statistical analysis
+		compare_for_lately = False
+		if len(self.removed_flow_counts) > analysis_index:
+			compare_for_lately = True  
+		
+		self.packet_in_counts_in_sec.append(current_packet_in_count) # append current packet_in count
+
+		# if it is more than 5 times of the average
+		if (current_packet_in_count > 5*(mean_count + st_dev)):
+			# compare for last 10 packet_in count (maybe something changed on the network)
+			if (compare_for_lately):
+				lately_counts = all_counts[-analysis_index:-1]
+				lately_mean_count = statistics.mean(lately_counts)
+				lately_st_dev = statistics.stdev(lately_counts)
+				if (current_packet_in_count > 3*(lately_mean_count + lately_st_dev)):
+					return True
+				else:
+					return False
+			else: 
+				return True
+		return False
+
+	# TODO call for every 5 sec
+	# this method calculates occupancy rate, then compare the last 5 of them if it's suspect then compare the last 5 removed flow counts if it's also suspect then returns True
+	def is_low_rate_attack(self):
+		self.store_removed_flow_count(self)
+		if (self.check_previous_occupancy_rates(self)):
+			if (self.check_removed_flows(self)):
+				return True
+		
+		return False

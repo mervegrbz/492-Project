@@ -72,9 +72,9 @@ class SimpleSwitch13(app_manager.RyuApp):
 
 			match = parser.OFPMatch()
 			actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
-			# why don't we send_flow_mod as we did in packet_in_handler?
-			self.add_flow(datapath, timestamp, 0, match, actions) #switch saves itselves without idle, hard timeout therefore not used send_flow
-
+			# switch saves itselves without idle, hard timeout therefore not used send_flow
+			self.add_flow(datapath, timestamp, 0, match, actions)
+	
 	# It will called when packet_in message comes to the controller
 	def send_flow_mod(self, datapath, timestamp, match, actions, priority, buffer_id=None):
 			ofp = datapath.ofproto
@@ -93,16 +93,16 @@ class SimpleSwitch13(app_manager.RyuApp):
 																		priority=priority, out_port=ofp.OFPP_ANY, out_group=ofp.OFPG_ANY,
 																		flags=ofp.OFPFF_SEND_FLOW_REM, match=match, instructions=inst)
 
-			appended = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id,
+			flow_mod = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id,
 												'match': mod.match, 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags,
 												'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout,
 												'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port}
-			flow_list.append(appended)
+			flow_list.append(flow_mod)
 			datapath.send_msg(mod)
 			# get the switch from switch_list from corresponding datapath_id, increment flow_mod, update the flow table
 			switch = self.switch_list[datapath.id]
-			# switch.flow_mods += 1
-			# switch.update_flow_table({k: v for k, v in flow_mod.items() if k != 'type'}, switch_class.FLOW_OPERATION.ADD)
+			switch.flow_mods += 1
+			switch.update_flow_table({k: v for k, v in flow_mod.items() if k != 'type'}, switch_class.FLOW_OPERATION.ADD)
 
 	# writing logs
 	def write_to_csv(self):
@@ -128,7 +128,6 @@ class SimpleSwitch13(app_manager.RyuApp):
 		datapath.send_msg(mod)
 
 	# When packet_in async messages comes from switch to the controller, it will trigger this function
-	
 	@set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
 	def _packet_in_handler(self, ev):
 		global flow_list
@@ -240,6 +239,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 			reason = 'GROUP DELETE'
 		else:
 			reason = 'unknown'
+		# TODO check occupance rate of switch
 		# add this message into csv, increase n_removed_flows, update the flow table and add flow_removed to this flow
 		flow_removed_details = {'type': 'FLOWREMOVED', 'timestamp': timestamp, 'datapath_id': datapath_id, 'match': match, 'cookie': cookie, 'priority': priority,'duration_sec': duration_sec, 'duration_nsec': duration_nsec, 'idle_timeout': idle_timeout, 'packet_count': packet_count, 'byte_count': byte_count, 'reason': reason}
 		flow_list.append(flow_removed_details)
@@ -262,7 +262,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 			reason = 'OFPET_BAD_REQUEST'
 		elif msg.type == dp.ofproto.OFPET_BAD_ACTION:
 			reason = 'OFPET_BAD_ACTION'
-		elif msg.type == dp.ofproto.OFPET_FLOW_MOD_FAILED:
+		elif msg.type == dp.ofproto.OFPET_FLOW_MOD_FAILED: #TODO add update thresholds function
 			reason = 'OFPET_FLOW_MOD_FAILED'
 		elif msg.type == dp.ofproto.OFPET_PORT_MOD_FAILED:
 			reason = 'OFPET_PORT_MOD_FAILED'

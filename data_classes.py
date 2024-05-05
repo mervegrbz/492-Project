@@ -12,3 +12,9 @@ class OccupancyRate:
 class PacketIn:
     flow_id: int
     in_port: int
+
+# this is for storing number of removed flows
+@dataclass
+class RemovedCount:
+    removed_count: float
+    time: float
