@@ -6,6 +6,7 @@ import pandas as pd
 import data_classes as data_model
 import detection as trigger
 import statistics
+from switch import *
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -59,8 +60,9 @@ class Switch:
 
 	history_batches = pd.DataFrame()
 
-	def __init__(self, connection_time, datapath_id, n_buffers, n_tables, capabilities):
+	def __init__(self, connection_time, datapath_id, n_buffers, n_tables, capabilities, switch_app: SimpleSwitch13):
 		self.connection_time = connection_time
+		self.switch_app = switch_app # for calling its function
 		self.datapath_id = datapath_id
 		self.n_buffers = n_buffers
 		self.n_tables = n_tables
@@ -190,7 +192,7 @@ class Switch:
 	def exceed_capacity(self):
 		isExceed = ((self.flow_mods + 1 - self.flow_removed)/self.capacity) > CAPACITY_THRESHOLD
 		if (isExceed):
-			trigger_detection = trigger.Detection(switch=self)
+			trigger_detection = trigger.Detection(switch=self, detection_type=trigger.Detection_TYPE.GENERAL.value, )
 		return isExceed
 	
 
