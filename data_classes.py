@@ -26,8 +26,8 @@ class FlowMod:
     match: dict
     command: int
     flags: int
-    idle_timeout: float
-    hard_timeout: float
+    idle_timeout: int
+    hard_timeout: int
     priority: int
     buffer_id: int
     out_port: int
@@ -47,13 +47,13 @@ class FlowRemoved:
     datapath_id: int
     timestamp: float
     match: dict #ip_protocol, ipv4 src, dst, type
-    cookie: int = 0
-    priority: int = 1
     idle_timeout: float
     duration_sec: float
     duration_nsec: int
     packet_count: int
     byte_count: int
     reason: str
+    cookie: int = 0
+    priority: int = 1
 
 

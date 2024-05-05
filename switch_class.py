@@ -33,28 +33,30 @@ class FLOW_OPERATION(Enum):
 
 # this is a switch class, to monitor the switch's features without getting from stat request
 class Switch:
-	packet_ins = [] # packet_in list, we can use it to store its mac address first,
-	# when we get the flow_mod, updating the flow table w.r.t this and flow mod would be beneficial.
+	# lists
+	packet_ins = [] # packet_in list, we can use it to store its mac address first,  when we get the flow_mod, updating the flow table w.r.t this and flow mod would be ben eficial.
 	flow_table = [] # flows with features from merging packet_in's and add_flow events
 	flow_removed = [] # flows that are removed from table, that will use in averages of flows existing
+	occupancy_rates = [] # occupancy_rate for comparing switch's occupancy in time accordingly
+	removed_flow_counts = [] # this is for comparing removed flow counts in time accordingly
+	packet_in_counts_in_sec = [] # this is for comparing packet in count in a sec to compare whether there is a high-rate attack
+	overload_timestamps = []
+
 	connection_time = 0
 	datapath_id = 0 # switch's id
 	n_buffers = 0 
-	n_tables = 0 
-	n_packet_in = 0
+	n_tables = 0 # number of flow tables in the switch
+	n_packet_in = 0 # cumulative packet in count
 	n_flow_removed = 0 #TODO  is it required? isn't it same with len(flow_removed)
 	flow_mods = 0 # number of added flows into the table (OFPFC_ADD)
-	capacity = 0
+	capacity = 0 # capacity of switch (number of flows that can be stored)
 	flow_id = 0 # this will help us to match packet_in and OFPFC_ADD messages, update the table correspondingly
-	capabilities = 0
+	capabilities = 0 # flow capabilities of flow tables
 	idle_timeout = 10
 	flow_average_duration = 0
 	flow_average_byte_per_packet = 0
 	state = "Normal"
-	overload_timestamps = []
-	occupancy_rates = [] # occupancy_rate for comparing switch's occupancy in time accordingly
-	removed_flow_counts = [] # this is for comparing removed flow counts in time accordingly
-	packet_in_counts_in_sec = [] # this is for comparing packet in count in a sec to compare whether there is a high-rate attack
+
 	history_batches = pd.DataFrame()
 
 	def __init__(self, connection_time, datapath_id, n_buffers, n_tables, capabilities):
@@ -63,6 +65,7 @@ class Switch:
 		self.n_buffers = n_buffers
 		self.n_tables = n_tables
 		self.capabilities = capabilities
+		self.capacity = capabilities * n_tables #TODO we design it as 50 for tables capabilities
 		self.packet_in_rates = []
 		columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet', 'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev', 'packet_in_diff_arr']
 		self.history_batches = pd.DataFrame(columns=columns)
@@ -91,38 +94,41 @@ class Switch:
 		average_byte_per_packet = 0
 			
 		# TODO get the last N elements of the removed flows to monitor change
-		for i in self.flow_removed:
-			duration_sec = i['duration_sec']
-			reason = i['reason']
-			byte_count = i['byte_count']
-			packet_count = i['packet_count']
+		for flow in self.flow_removed:
+			duration_sec = flow.duration_sec
+			reason = flow.reason
+			byte_count = flow.byte_count
+			packet_count = flow.packet_count
+
 			average_byte_per_packet += byte_count/packet_count  if packet_count > 0 else 0
 			average_duration += duration_sec
-		flow_average_duration = average_duration/len(self.flow_removed) if (len(self.flow_removed)>0) else 0
-		flow_average_byte_per_packet = average_byte_per_packet / len(self.flow_removed) if (len(self.flow_removed)>0) else 0
+
+		self.flow_average_duration = average_duration/len(self.flow_removed) if (len(self.flow_removed)>0) else 0
+		self.flow_average_byte_per_packet = average_byte_per_packet / len(self.flow_removed) if (len(self.flow_removed)>0) else 0
 		return self.flow_average_duration, self.flow_average_byte_per_packet
 
 	# this function updates the flow table, if the operation is ADD, append the flow into the flowtable,
 	# else if it's delete, delete it from the table by using its match criteria
-	def update_flow_table(self, flow, operation):
+	def update_flow_table(self, current_flow, operation):
+		# current flow is a FlowMod
 		if operation == FLOW_OPERATION.ADD:
-				self.flow_table.append(flow)
+				self.flow_table.append(current_flow)
 				self.flow_mods += 1
-		if operation == FLOW_OPERATION.DELETE:
+		# current flow is a FlowRemoved
+		elif operation == FLOW_OPERATION.DELETE:
 				for flow in self.flow_table:
-						if flow.match == flow.match:
+						if flow.match == current_flow.match:
 								self.flow_table.remove(flow)
-								self.flow_removed.append(flow)
+								self.flow_removed.append(current_flow)
 								self.n_flow_removed += 1
 
 	# this function calculates average duration of flows in the flow table
 	def inspect_flow_table(self):
 		total_duration = 0
 
-		##
-		for i in self.flow_table:
+		for flow in self.flow_table:
 			now = time.time()
-			total_duration += now - i['timestamp']
+			total_duration += now - flow.timestamp
 		average_duration =   total_duration/len(self.flow_table) if len(self.flow_table) > 0 else 0
 		print("Average duration of flows in flow table is %s" % average_duration)
 		return average_duration
@@ -166,7 +172,7 @@ class Switch:
 	# This method may work every 5 seconds to keep track of the flow table 5sn
 	def flow_table_stats(self):
 
-		capacity_used = self.calc_flow_stats()
+		capacity_used = self.calc_occupance_rate()
 		flow_average_duration, flow_average_byte_per_packet = self.calc_removed_flows()
 		average_flow_duration_on_table = self.inspect_flow_table()
 		mean, std_dev, diff_arr = self.packet_in_rates_calc()

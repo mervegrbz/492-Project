@@ -246,10 +246,11 @@ class SimpleSwitch13(app_manager.RyuApp):
 		# add this message into csv, increase n_removed_flows, update the flow table and add flow_removed to this flow
 		flow_removed_details = {'type': 'FLOWREMOVED', 'timestamp': timestamp, 'datapath_id': datapath_id, 'match': match, 'cookie': cookie, 'priority': priority,'duration_sec': duration_sec, 'duration_nsec': duration_nsec, 'idle_timeout': idle_timeout, 'packet_count': packet_count, 'byte_count': byte_count, 'reason': reason}
 		flow_list.append(flow_removed_details)
-		switch = self.switch_list[datapath_id]
-		switch.n_flow_removed += 1
-		switch.update_flow_table({k: v for k, v in flow_removed_details.items() if k != 'type'}, switch_class.FLOW_OPERATION.DELETE)
-		switch.flow_removed.append({k: v for k, v in flow_removed_details.items() if k != 'type'})
+		switch = self.switch_list[datapath_id]	
+		removed_flow = datamodel.FlowRemoved(datapath_id=datapath_id, timestamp=timestamp, match=match, idle_timeout=idle_timeout, 
+									   duration_sec=duration_sec,duration_nsec=duration_nsec, packet_count=packet_count,
+										 byte_count=byte_count, reason= reason, cookie=cookie, priority=priority)			   
+		switch.update_flow_table(removed_flow, switch_class.FLOW_OPERATION.DELETE)
 
 	# This function will trigger whenever an error messages comes into the controller
 	@set_ev_cls(ofp_event.EventOFPErrorMsg, [HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER, MAIN_DISPATCHER])
