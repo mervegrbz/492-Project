@@ -22,6 +22,7 @@ from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet, ipv4, tcp, udp, icmp, in_proto
 from ryu.lib.packet import ether_types
 from ryu import utils
+import data_classes as datamodel
 
 import switch_class
 
@@ -46,7 +47,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 	def __init__(self, *args, **kwargs):
 			super(SimpleSwitch13, self).__init__(*args, **kwargs)
 			self.mac_to_port = {}
-			self.switch_list = {}
+			self.switch_list = {} #consists of SwitchFeatures in dataclasses
 
 	# when switch features comes to the controller, it will append its some features into the flow_list which we will use in our csv files
 	# you can check for this link for following handler classes https://ryu.readthedocs.io/en/latest/ofproto_v1_3_ref.html
@@ -62,8 +63,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 			n_tables = ev.msg.n_tables
 			capabilities = ev.msg.capabilities
 
-			switch = switch_class.Switch(
-					timestamp, datapath_id, n_buffers, n_tables, capabilities)
+			switch = switch_class.Switch(timestamp, datapath_id, n_buffers, n_tables, capabilities)
 			# adding switch to the switch list with its datapath_id
 			self.switch_list[datapath_id] = switch
 
@@ -101,8 +101,10 @@ class SimpleSwitch13(app_manager.RyuApp):
 			datapath.send_msg(mod)
 			# get the switch from switch_list from corresponding datapath_id, increment flow_mod, update the flow table
 			switch = self.switch_list[datapath.id]
-			switch.flow_mods += 1
-			switch.update_flow_table({k: v for k, v in flow_mod.items() if k != 'type'}, switch_class.FLOW_OPERATION.ADD)
+			flow = datamodel.FlowMod(datapath_id=datapath.id, timestamp=timestamp, match=mod.match, command=mod.command, flags=mod.flags, idle_timeout=mod.idle_timeout, hard_timeout=mod.hard_timeout,
+						   priority=mod.priority, buffer_id = mod.buffer_id, out_port = mod.out_port, cookie=mod.cookie)
+			switch.update_flow_table(flow, switch_class.FLOW_OPERATION.ADD)
+			#switch.update_flow_table({k: v for k, v in flow_mod.items() if k != 'type'}, switch_class.FLOW_OPERATION.ADD)
 
 	# writing logs
 	def write_to_csv(self):
@@ -123,8 +125,9 @@ class SimpleSwitch13(app_manager.RyuApp):
 		flow_mod = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id, 'match': mod.match, 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags, 'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout, 'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port }
 		flow_list.append(flow_mod)
 		switch = self.switch_list[datapath.id]
-		switch.flow_mods += 1
-		switch.update_flow_table({k: v for k, v in flow_mod.items() if k != 'type'}, switch_class.FLOW_OPERATION.ADD)
+		flow = datamodel.FlowMod(datapath_id=datapath.id, timestamp=timestamp, match=match, command=mod.command, flags=mod.flags, idle_timeout=mod.idle_timeout, hard_timeout=mod.hard_timeout,
+						   priority=mod.priority, buffer_id = mod.buffer_id, out_port = mod.out_port, cookie=mod.cookie)
+		switch.update_flow_table(flow, switch_class.FLOW_OPERATION.ADD)
 		datapath.send_msg(mod)
 
 	# When packet_in async messages comes from switch to the controller, it will trigger this function

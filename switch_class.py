@@ -6,6 +6,7 @@ import pandas as pd
 import data_classes as data_model
 import detection as trigger
 import statistics
+
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
@@ -108,10 +109,10 @@ class Switch:
 				self.flow_table.append(flow)
 				self.flow_mods += 1
 		if operation == FLOW_OPERATION.DELETE:
-				for i in self.flow_table:
-						if i.match == flow.match:
-								self.flow_table.remove(i)
-								self.flow_removed.append(i)
+				for flow in self.flow_table:
+						if flow.match == flow.match:
+								self.flow_table.remove(flow)
+								self.flow_removed.append(flow)
 								self.n_flow_removed += 1
 
 	# this function calculates average duration of flows in the flow table
