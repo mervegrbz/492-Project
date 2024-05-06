@@ -1,5 +1,7 @@
 from enum import Enum
 from typing import List
+import numpy as np
+from datetime import datetime
 import statistics
 
 # enumaration type of detection
@@ -46,8 +48,7 @@ class Detection:
   def is_low_rate(self, removed_enter_times, removed_removing_times, packet_in_counts, occupancy_rates):
      return True
   
-  # TODO how much we need to wait for stats?
-  # what about saving detections in a list, and trigger its method? Seems ok I think
+  # started low rate detection with stats in increased occupancy rate time and general stats
   def start_low_rate_detection(self, stats_increased, stats):
      print("start_low_rate_detection")
      #calc avg byte per sec for flows that appends in increased occupance rate times
@@ -95,9 +96,28 @@ class Detection:
 
 
   def high_rate_detection(self):
-     pass
+    flow_table = self.switch.flow_table
+    timestamp = datetime.now()
+    timestamp = timestamp.timestamp()
+    flows_duration_smaller_than_idle_timeout = [flow for flow in flow_table if (flow.timestamp - timestamp)< flow.idle_timeout]
+    
+    if (len(flows_duration_smaller_than_idle_timeout) * 4 > len(flow_table)): # if newly appended flows are at least %25 of the flow table 
+      print("You are under high-rate attack")  
+      for flow in flow_table:
+        print("Delete flow with match: " + str(flow.match))  
+        self.switch_app.delete_flows(self.switch.datapath, flow.match, flow.priority)
+    
 	
   def general_detection(self):
-     pass
+    packet_in_counts = self.switch.packet_in_counts_in_sec
+    if (len(packet_in_counts) > 2):
+      packet_ins_last_two_sec = packet_in_counts[-1] + packet_in_counts[-2]
+      mean = np.mean(packet_in_counts)
+      stdev = np.std(packet_in_counts)
+      if (packet_ins_last_two_sec > 5*(mean+stdev)):
+        self.high_rate_detection()
+      else:
+         self.low_rate_detection()
+      
     
     

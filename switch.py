@@ -253,6 +253,18 @@ class SimpleSwitch13(app_manager.RyuApp):
 										 byte_count=byte_count, reason= reason, cookie=cookie, priority=priority)			   
 		switch.update_flow_table(removed_flow, switch_class.FLOW_OPERATION.DELETE)
 
+	# this method for deleting flows directly from controller
+	def delete_flows(self, datapath, match, priority=1):
+		ofproto = datapath.ofproto
+		parser = datapath.ofproto_parser
+		# Create a flow mod message to delete flows, with no actions (empty list).
+		mod = parser.OFPFlowMod(datapath=datapath, match=match, command=ofproto.OFPFC_DELETE,
+								priority=priority, out_port=ofproto.OFPP_ANY, out_group=ofproto.OFPG_ANY,
+								flags=ofproto.OFPFF_SEND_FLOW_REM)
+		datapath.send_msg(mod)
+		switch = self.switch_list[datapath.datapath_id]	
+		print(f"Flow deleted: {match}")
+
 	# This function will trigger whenever an error messages comes into the controller
 	@set_ev_cls(ofp_event.EventOFPErrorMsg, [HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER, MAIN_DISPATCHER])
 	def error_msg_handler(self, ev):

@@ -87,6 +87,8 @@ class Switch:
 			overload_time = time.time()
 			self.overload_timestamps.append(overload_time)
 			print("Switch %s is overloaded" % self.datapath_id)
+			trigger_detection = Detection(switch=self, detection_type= Detection_TYPE.GENERAL.value, switch_app=self.switch_app)
+			self.detections.append(trigger_detection) #TODO ensure not calling it consecutively
 	
 		current_occupancy_rate = data_model.OccupancyRate(used_capacity / self.capacity,time.time())
 		self.occupancy_rates.append(current_occupancy_rate)
@@ -195,17 +197,7 @@ class Switch:
 				self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
 		else:
 			self.check_for_attacks(self, False)
-		
 
-	# checks whether flow count exceed capacity 
-	# TODO convert it to length of flow_table if it works fine
-	def exceed_capacity(self):
-		isExceed = ((self.flow_mods + 1 - self.flow_removed)/self.capacity) > CAPACITY_THRESHOLD
-		if (isExceed):
-			trigger_detection = Detection(switch=self, detection_type= Detection_TYPE.GENERAL.value, switch_app=self.switch_app)
-			self.detections.append(trigger_detection)
-		return isExceed
-	
 
 	# TODO flow_removed 0 mı yapmalıyız, ama o sırada gelen olursa kaydeder miyiz?
 	# it stores the cumulative number of removed flows to compare them later
@@ -339,6 +331,7 @@ class Switch:
 				calling_detection_module.start_low_rate_detection(stats_in_increased_occupancy_rate, stats)
 
 	# it checks whether it's under attack, if so it will start detection module
+ 	# TODO check it's not the initial traffic
 	def check_for_attacks(self, check_for_both):
 		if (self.is_high_rate_attack()):
 			trigger_detection = Detection(switch=self, detection_type= Detection_TYPE.HIGH_RATE.value, switch_app=self.switch_app) 
