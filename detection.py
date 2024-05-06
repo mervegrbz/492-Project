@@ -19,7 +19,7 @@ class Detection:
     assert isinstance(switch, Switch)
     from switch import SimpleSwitch13  # Import here to avoid circular dependency at module load
     assert isinstance(switch_app, SimpleSwitch13)
-    print("init-detection")
+    print("init-detection with type: " + str(detection_type))
     self.switch = switch
     self.detection_type = detection_type
     self.switch_app = switch_app
@@ -55,7 +55,8 @@ class Detection:
      avg_byte_sec_increased = self.calc_avg_bytes_per_sec(stats_increased)
      if (avg_byte_sec_increased < 3):
         print("stats")
-        avg_byte_sec = self.calc_avg_bytes_per_sec(stats)
+        mean_byte_per_sec, mean_packet_per_secs, mean_byte_per_packets = self.calc_avges(stats)
+        # TODO add logic here
 
   
   #calc avg byte per sec for flows that appends in increased occupance rate times
@@ -68,6 +69,30 @@ class Detection:
         return mean
      print("bombos")
      return 0
+  
+  #calc avg byte per sec, packet per sec, byte per pack
+  def calc_avges(self, stats):
+    byte_per_secs = [stat['byte_count_per_second'] for stat in stats]
+    packet_per_secs = [stat['packet_count_per_second'] for stat in stats]
+    byte_per_packets = [stat['byte_per_packet'] for stat in stats]
+    mean_byte_per_sec = 0
+    mean_packet_per_secs = 0
+    mean_byte_per_packets = 0
+    if (byte_per_secs != []):
+      mean_byte_per_sec = statistics.mean(byte_per_secs)
+      print("avg byte per sec: ")
+      print(mean_byte_per_sec)
+    if (packet_per_secs != []):
+        mean_packet_per_secs = statistics.mean(packet_per_secs)
+        print("avg packet per sec: ")
+        print(mean_packet_per_secs)
+    if (byte_per_packets != []):
+        mean_byte_per_packets = statistics.mean(packet_per_secs)
+        print("avg packet per sec: ")
+        print(mean_byte_per_packets)
+
+    return mean_byte_per_sec,mean_packet_per_secs,mean_byte_per_packets
+
 
   def high_rate_detection(self):
      pass

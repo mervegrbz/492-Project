@@ -9,7 +9,7 @@ class StatScheduler:
         self.scheduler = BackgroundScheduler()
         
         # Schedule my_task to run every 5 seconds
-        self.scheduler.add_job(task, 'interval', seconds=5)
+        self.scheduler.add_job(task, 'interval', seconds=1)
         
         # Start the scheduler
         self.scheduler.start()
