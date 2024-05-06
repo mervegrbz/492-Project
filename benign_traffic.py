@@ -19,8 +19,6 @@ def traffic(net: Mininet):
     h1 = net.get('h1')
     h2 = net.get('h2')
 
-   
-    
     hosts = [h1, h2]    
     print("--------------------------------------------------------------------------------")    
     print("Generating traffic ...")    
@@ -30,7 +28,7 @@ def traffic(net: Mininet):
     sleep(2)
     
     
-    for i in range(6):
+    for i in range(2):
         
         print("--------------------------------------------------------------------------------")    
         print("Iteration n {} ...".format(i+1))
@@ -39,18 +37,15 @@ def traffic(net: Mininet):
         for j in range(2):
             src = choice(hosts)
             dst = ip_generator()
+            print(dst)
+            print(src)
             
-            if j <9:
-                print("generating ICMP traffic between %s and h%s and TCP/UDP traffic between %s and h1" % (src,((dst.split('.'))[3]),src))
-                src.cmd("ping {} -c 100 &".format(dst))
-                src.cmd("iperf -p 5050 -c 10.0.0.1")
-                src.cmd("iperf -p 5051 -u -c 10.0.0.1")
-            else:
-                print("generating ICMP traffic between %s and h%s and TCP/UDP traffic between %s and h1" % (src,((dst.split('.'))[3]),src))
-                src.cmd("ping {} -c 100".format(dst))
-                src.cmd("iperf -p 5050 -c 10.0.0.1")
-                src.cmd("iperf -p 5051 -u -c 10.0.0.1")
-            
+        
+            print("generating ICMP traffic between %s and h%s and TCP/UDP traffic between %s and h1" % (src,((dst.split('.'))[3]),src))
+            src.cmd(f"ping {dst} -c 10 &")
+            src.cmd("iperf -p 5050 -c 10.0.0.1")
+            src.cmd("iperf -p 5051 -u -c 10.0.0.1")
+        
             # print("%s Downloading index.html from h1" % src)
             # src.cmd("wget http://10.0.0.1/index.html")
             # print("%s Downloading test.zip from h1" % src)

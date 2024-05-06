@@ -176,8 +176,8 @@ class Switch:
 	# This method may work every 5 seconds to keep track of the flow table 5sn
 	def flow_table_stats(self):
 		print("flow_table_stats")
-		trigger_detection = Detection(switch=self, detection_type= Detection_TYPE.LOW_RATE.value, switch_app=self.switch_app) # call it
-		self.detections.append(trigger_detection)
+		# trigger_detection = Detection(switch=self, detection_type= Detection_TYPE.LOW_RATE.value, switch_app=self.switch_app) # call it
+		# self.detections.append(trigger_detection)
 		capacity_used = self.calc_occupance_rate()
 		flow_average_duration, flow_average_byte_per_packet = self.calc_removed_flows()
 		average_flow_duration_on_table = self.inspect_flow_table()
