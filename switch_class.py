@@ -4,9 +4,10 @@ from enum import Enum
 import numpy as np
 import pandas as pd
 import data_classes as data_model
-import detection as trigger
+from detection import *
 import statistics
 from switch import *
+from typing import List
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -42,6 +43,7 @@ class Switch:
 	removed_flow_counts = [] # this is for comparing removed flow counts in time accordingly
 	packet_in_counts_in_sec = [] # this is for comparing packet in count in a sec to compare whether there is a high-rate attack
 	overload_timestamps = []
+	detections = [] # for sending stat request's results to the corresponding detection module
 
 	connection_time = 0
 	datapath_id = 0 # switch's id
@@ -173,7 +175,8 @@ class Switch:
 
 	# This method may work every 5 seconds to keep track of the flow table 5sn
 	def flow_table_stats(self):
-
+		print("flow_table_stats")
+		trigger_detection = Detection(switch=self@Switch, detection_type= Detection_TYPE.GENERAL.value, switch_app=self.switch_app) # call it
 		capacity_used = self.calc_occupance_rate()
 		flow_average_duration, flow_average_byte_per_packet = self.calc_removed_flows()
 		average_flow_duration_on_table = self.inspect_flow_table()
@@ -192,7 +195,8 @@ class Switch:
 	def exceed_capacity(self):
 		isExceed = ((self.flow_mods + 1 - self.flow_removed)/self.capacity) > CAPACITY_THRESHOLD
 		if (isExceed):
-			trigger_detection = trigger.Detection(switch=self, detection_type=trigger.Detection_TYPE.GENERAL.value, )
+			trigger_detection = Detection(switch=self@Switch, detection_type= Detection_TYPE.GENERAL.value, switch_app=self.switch_app)
+			self.detections.append(trigger_detection)
 		return isExceed
 	
 

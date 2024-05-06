@@ -15,7 +15,7 @@ class Detection:
   detection_type = 1
 
   # initialize detection with switch and the detection type
-  def __init__(self, switch: Switch, detection_type: Detection_TYPE, switch_app:SimpleSwitch13):
+  def __init__(self, switch: Switch, detection_type: int, switch_app:SimpleSwitch13):
     self.switch = switch
     self.detection_type = detection_type
     self.switch_app = switch_app
@@ -44,6 +44,7 @@ class Detection:
   def start_low_rate_detection(self):
      self.switch_app.send_flow_stats_request(self.switch.datapath_id),
      # TODO how much we need to wait for stats?
+     # what about saving detections in a list, and trigger its method? Seems ok I think
 
   def high_rate_detection(self):
      pass

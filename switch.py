@@ -279,6 +279,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 	# this will trigger when EventOFPStatsReply comes? 
 	@set_ev_cls(ofp_event.EventOFPStatsReply, MAIN_DISPATCHER)
 	def stats_reply_handler(self, ev):
+		print("stats_reply_handler")
 		msg = ev.msg
 		ofp = msg.datapath.ofproto
 		body = ev.msg.body
@@ -288,6 +289,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 
 	# when responses comes from switches after sending flow stats request, this function will be triggered
 	def flow_stats_reply_handler(self, body):
+		print("flow_stats_reply_handler")
 		flows = []
 		for stat in body:
 				flows.append('table_id=%s '
@@ -302,6 +304,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 											stat.idle_timeout, stat.hard_timeout,
 											stat.cookie, stat.packet_count, stat.byte_count,
 											stat.match, stat.instructions))
+		print('FlowStats: %s', flows)
 		self.logger.debug('FlowStats: %s', flows)
 
 	# this will send flow stats request to the switches (it will used in getting requests at detection)
