@@ -119,6 +119,7 @@ class Switch:
 	def update_flow_table(self, current_flow, operation):
 		# current flow is a FlowMod
 		if operation == FLOW_OPERATION.ADD:
+				print("update_table")
 				self.flow_table.append(current_flow)
 				self.flow_mods += 1
 		# current flow is a FlowRemoved
@@ -178,9 +179,11 @@ class Switch:
 
 	# This method may work every seconds to keep track of the flow table, it has a counter and when it reaches 5 (every 5 sec) it checks for low-rate attacks
 	def flow_table_stats(self):
-		print("flow_table_stats")
 		self.schedular_iteration += 1
 		if (self.schedular_iteration == 5):
+			print("flow_table_stats")
+			print("flow_table: ")
+			print(self.flow_table)
 			self.schedular_iteration = 0
 			self.check_for_attacks(True)
 			capacity_used = self.calc_occupance_rate()

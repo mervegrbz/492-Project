@@ -19,6 +19,7 @@ class MininetTopo():
         else:
             print('Invalid topology')
             sys.exit(1)
+        
         self.master_node = Node('master')
         
     def start(self):
@@ -78,7 +79,7 @@ if __name__ == '__main__':
         h2.cmd('python3 -m http.server 80 &')
         # malicious = attack_sim.malicious_host('h1',h1,10)
         # malicious.attack_controller_ip(50, 30, number_of_host_per_switch*number_of_switch )
-        benign_traffic.traffic(topo.net, number_of_host_per_switch*number_of_switch )
+        #benign_traffic.traffic(topo.net, number_of_host_per_switch*number_of_switch )
         CLI( topo.net )
         print('CLI opened')
         topo.stop()

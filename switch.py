@@ -101,6 +101,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 			flow_list.append(flow_mod)
 			datapath.send_msg(mod)
 			# get the switch from switch_list from corresponding datapath_id, increment flow_mod, update the flow table
+			print("send_flow_mod")
 			switch = self.switch_list[datapath.id]
 			flow = datamodel.FlowMod(datapath_id=datapath.id, timestamp=timestamp, match=mod.match, command=mod.command, flags=mod.flags, idle_timeout=mod.idle_timeout, hard_timeout=mod.hard_timeout,
 						   priority=mod.priority, buffer_id = mod.buffer_id, out_port = mod.out_port, cookie=mod.cookie)
