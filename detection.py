@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import List
+import statistics
 
 # enumaration type of detection
 class Detection_TYPE(Enum):
@@ -39,17 +40,31 @@ class Detection:
      removed_flows_removed_times = [rf.timestamp for rf in self.switch.flow_removed]
      occupancy_rates = [o_r.occupancy_rate for o_r in self.switch.occupancy_rates]
      if (self.is_low_rate(removed_enter_times=removed_flows_enter_times,  removed_removing_times=removed_flows_removed_times, packet_in_counts=self.switch.packet_in_counts_in_sec, occupancy_rates=occupancy_rates)):
-        self.start_low_rate_detection()
+        self.switch_app.send_flow_stats_request(self.switch.datapath)
      
   # ml algorithm for detecting whether it is a low rate attack
   def is_low_rate(self, removed_enter_times, removed_removing_times, packet_in_counts, occupancy_rates):
      return True
   
-  def start_low_rate_detection(self):
+  # TODO how much we need to wait for stats?
+  # what about saving detections in a list, and trigger its method? Seems ok I think
+  def start_low_rate_detection(self, stats_increased, stats):
      print("start_low_rate_detection")
-     self.switch_app.send_flow_stats_request(self.switch.datapath)
-     # TODO how much we need to wait for stats?
-     # what about saving detections in a list, and trigger its method? Seems ok I think
+     #calc avg byte per sec for flows that appends in increased occupance rate times
+     print("stats_increased")
+     avg_byte_sec_increased = self.calc_avg_bytes_per_sec(stats_increased)
+     if (avg_byte_sec_increased < 3):
+        print("stats")
+        avg_byte_sec = self.calc_avg_bytes_per_sec(stats)
+
+  
+  #calc avg byte per sec for flows that appends in increased occupance rate times
+  def calc_avg_bytes_per_sec(self, stats):
+     byte_per_secs = [stat['byte_count_per_second'] for stat in stats]
+     mean = statistics.mean(byte_per_secs)
+     print("avg byte per sec: ")
+     print(mean)
+     return mean
 
   def high_rate_detection(self):
      pass

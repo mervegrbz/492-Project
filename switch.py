@@ -288,11 +288,11 @@ class SimpleSwitch13(app_manager.RyuApp):
 		if msg.type == ofp.OFPST_FLOW:
 			self.flow_stats_reply_handler(body)
 
-	"""
+	
 	
 	@set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
 	def flow_stats_reply_handler(self, ev):
-		print("flow_stats_reply_handler")
+		
 		flows = []
 		for stat in ev.msg.body:
 			flows.append('table_id=%s '
@@ -308,7 +308,75 @@ class SimpleSwitch13(app_manager.RyuApp):
 						stat.cookie, stat.packet_count, stat.byte_count,
 						stat.match, stat.instructions))
 		self.logger.debug('FlowStats: %s', flows)
+	"""
 
+	@set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
+	def _flow_stats_reply_handler(self, ev):
+		print("flow_stats_reply_handler")
+		timestamp = timestamp.timestamp()
+		file0 = open("PredictFlowStatsfile.csv","w")
+		file0.write('timestamp,datapath_id,flow_id,ip_src,tp_src,ip_dst,tp_dst,ip_proto,icmp_code,icmp_type,flow_duration_sec,flow_duration_nsec,idle_timeout,hard_timeout,flags,packet_count,byte_count,packet_count_per_second,packet_count_per_nsecond,byte_count_per_second,byte_count_per_nsecond,byte_per_packet\n')
+		flow_stats = []
+		body = ev.msg.body
+		icmp_code = -1
+		icmp_type = -1
+		tp_src = 0
+		tp_dst = 0
+		for stat in sorted([flow for flow in body if (flow.priority == 1) ], key=lambda flow:
+            (flow.match['eth_type'],flow.match['ipv4_src'],flow.match['ipv4_dst'],flow.match['ip_proto'])):
+			ip_src = stat.match['ipv4_src']
+			ip_dst = stat.match['ipv4_dst']
+			ip_proto = stat.match['ip_proto']
+
+			if stat.match['ip_proto'] == 1:
+				icmp_code = stat.match['icmpv4_code']
+				icmp_type = stat.match['icmpv4_type']
+			elif stat.match['ip_proto'] == 6:
+				tp_src = stat.match['tcp_src']
+				tp_dst = stat.match['tcp_dst']
+			elif stat.match['ip_proto'] == 17:
+				tp_src = stat.match['udp_src']
+				tp_dst = stat.match['udp_dst']
+			flow_id = str(ip_src) + str(tp_src) + str(ip_dst) + str(tp_dst) + str(ip_proto)
+			try:
+				packet_count_per_second = stat.packet_count/stat.duration_sec
+				packet_count_per_nsecond = stat.packet_count/stat.duration_nsec
+			except:
+				packet_count_per_second = 0
+				packet_count_per_nsecond = 0
+			
+			try:
+				byte_count_per_second = stat.byte_count/stat.duration_sec
+				byte_count_per_nsecond = stat.byte_count/stat.duration_nsec
+			except:
+				byte_count_per_second = 0
+				byte_count_per_nsecond = 0
+
+			try:
+				byte_per_packet = stat.byte_count/stat.packet_count
+			except:
+				byte_per_packet = 0
+			
+			file0.write("{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n"
+                .format(timestamp, ev.msg.datapath.id, flow_id, ip_src, tp_src,ip_dst, tp_dst,
+                        stat.match['ip_proto'],icmp_code,icmp_type,
+                        stat.duration_sec, stat.duration_nsec,
+                        stat.idle_timeout, stat.hard_timeout,
+                        stat.flags, stat.packet_count,stat.byte_count,
+                        packet_count_per_second,packet_count_per_nsecond,
+                        byte_count_per_second,byte_count_per_nsecond,byte_per_packet))
+			stat = {'timestamp': timestamp, 'datapath_id':ev.msg.datapath.id, 'duration':stat.duration_sec, 'packet_count_per_second': packet_count_per_second, 'byte_count_per_second': byte_count_per_second, 'byte_per_packet':byte_per_packet,
+		   'ip_proto': ip_proto, 'ip_src':ip_src, 'ip_dst': ip_dst, 'tp_src':tp_src, 'tp_dst':tp_dst, 'icmp_code': icmp_code, 'icmp_type':icmp_type
+		   }
+			# TODO need to send w.r.t datapath_id
+			
+			flow_stats.append(stat)
+			
+
+		switch = self.switch_list[ev.msg.datapath.id]
+		switch.get_stats(flow_stats)
+		file0.close()
+            
 	# this will send flow stats request to the switches (it will used in getting requests at detection)
 	def send_flow_stats_request(self, datapath):
 		print("send_flow_stats_request")

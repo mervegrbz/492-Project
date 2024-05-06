@@ -321,3 +321,14 @@ class Switch:
 				return True
 		
 		return False
+	
+	# get stats from controller's _flow_stats_reply_handler, detection type can be low_rate or high_rate
+	# stats is a list that consists each flow as a dictionary
+	def get_stats(self, stats):
+		if (self.detections != []):
+			calling_detection_module = self.detections[-1] # call the lately running detection module
+			if (calling_detection_module.detection_type == Detection_TYPE.LOW_RATE.value):
+				stats_in_increased_occupancy_rate = [stat for stat in stats if stat['duration'] < 20]
+				calling_detection_module.start_low_rate_detection(stats_in_increased_occupancy_rate, stats)
+
+
