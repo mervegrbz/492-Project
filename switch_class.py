@@ -40,7 +40,7 @@ class Switch:
 	flow_removed = [] # flows that are removed from table, that will use in averages of flows existing
 	occupancy_rates = [] # occupancy_rate for comparing switch's occupancy in time accordingly
 	removed_flow_counts = [] # this is for comparing removed flow counts in time accordingly
-	packet_in_counts_in_sec = [] # this is for comparing packet in count in a sec to compare whether there is a high-rate attack
+	packet_in_rates = [] # this is for comparing packet in count in a sec to compare whether there is a high-rate attack
 	overload_timestamps = []
 	detections = [] # for sending stat request's results to the corresponding detection module
 
@@ -71,7 +71,7 @@ class Switch:
 		self.n_tables = n_tables
 		self.capabilities = capabilities
 		self.capacity = capabilities * n_tables #TODO we design it as 50 for tables capabilities
-		self.packet_in_rates = []
+		#self.packet_in_rates = []
 		columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet', 'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev', 'packet_in_diff_arr']
 		self.history_batches = pd.DataFrame(columns=columns)
 		self.scheduler = BackgroundScheduler()
@@ -165,7 +165,7 @@ class Switch:
 		std_dev = np.std(diff_arr)
 		mean = np.mean(diff_arr)
 
-		self.packet_in_rates.append(self.n_packet_in)
+		#self.packet_in_rates.append(self.n_packet_in)
 
 		new_diff_arr = np.diff(self.packet_in_rates)
 		new_std_dev = np.std(new_diff_arr)
@@ -182,7 +182,7 @@ class Switch:
 		self.schedular_iteration += 1
 		if (self.schedular_iteration == 5):
 			self.schedular_iteration = 0
-			self.check_for_attacks(self, True)
+			self.check_for_attacks(True)
 			capacity_used = self.calc_occupance_rate()
 			flow_average_duration, flow_average_byte_per_packet = self.calc_removed_flows()
 			average_flow_duration_on_table = self.inspect_flow_table()
@@ -196,7 +196,7 @@ class Switch:
 				print(len(self.history_batches))
 				self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
 		else:
-			self.check_for_attacks(self, False)
+			self.check_for_attacks(False)
 
 
 	# TODO flow_removed 0 mı yapmalıyız, ama o sırada gelen olursa kaydeder miyiz?
@@ -277,14 +277,18 @@ class Switch:
 		
 		# this scenerio is for not removing the packet in count, if we will remove for optimize our system this should be changed
 		previous_packet_in_count = 0
-		if (len(self.packet_in_counts_in_sec) > 0):
-			previous_packet_in_count = self.packet_in_counts_in_sec[-1]
+		if (len(self.packet_in_rates) > 1):
+			previous_packet_in_count = self.packet_in_rates[-1]
+		
+		else:
+			self.packet_in_rates.append(self.n_packet_in) # append current packet_in count
+			return False
 
-		current_packet_in_count = len(self.packet_in_counts_in_sec) - previous_packet_in_count
+		current_packet_in_count = self.n_packet_in - previous_packet_in_count
 		
 		
 		# Calculate the mean and standard deviation of all recorded removed flow counts
-		all_counts = [count for count in self.packet_in_counts_in_sec]
+		all_counts = [count for count in self.packet_in_rates]
 		mean_count = statistics.mean(all_counts)
 		st_dev = statistics.stdev(all_counts)
 		analysis_index = 10
@@ -294,7 +298,7 @@ class Switch:
 		if len(self.removed_flow_counts) > analysis_index:
 			compare_for_lately = True  
 		
-		self.packet_in_counts_in_sec.append(current_packet_in_count) # append current packet_in count
+		self.packet_in_rates.append(current_packet_in_count) # append current packet_in count
 
 		# if it is more than 5 times of the average
 		if (current_packet_in_count > 5*(mean_count + st_dev)):
@@ -314,9 +318,9 @@ class Switch:
 	# TODO call for every 5 sec
 	# this method calculates occupancy rate, then compare the last 5 of them if it's suspect then compare the last 5 removed flow counts if it's also suspect then returns True
 	def is_low_rate_attack(self):
-		self.store_removed_flow_count(self)
-		if (self.check_previous_occupancy_rates(self)):
-			if (self.check_removed_flows(self)):
+		self.store_removed_flow_count()
+		if (self.check_previous_occupancy_rates()):
+			if (self.check_removed_flows()):
 				return True
 				
 		return False

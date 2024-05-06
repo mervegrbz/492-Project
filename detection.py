@@ -109,7 +109,7 @@ class Detection:
     
 	
   def general_detection(self):
-    packet_in_counts = self.switch.packet_in_counts_in_sec
+    packet_in_counts = self.switch.packet_in_rates
     if (len(packet_in_counts) > 2):
       packet_ins_last_two_sec = packet_in_counts[-1] + packet_in_counts[-2]
       mean = np.mean(packet_in_counts)
