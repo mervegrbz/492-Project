@@ -23,6 +23,7 @@ from ryu.lib.packet import ethernet, ipv4, tcp, udp, icmp, in_proto
 from ryu.lib.packet import ether_types
 from ryu import utils
 import data_classes as datamodel
+from datetime import datetime
 
 import switch_class
 
@@ -313,6 +314,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 	@set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
 	def _flow_stats_reply_handler(self, ev):
 		print("flow_stats_reply_handler")
+		timestamp = datetime.now()
 		timestamp = timestamp.timestamp()
 		file0 = open("PredictFlowStatsfile.csv","w")
 		file0.write('timestamp,datapath_id,flow_id,ip_src,tp_src,ip_dst,tp_dst,ip_proto,icmp_code,icmp_type,flow_duration_sec,flow_duration_nsec,idle_timeout,hard_timeout,flags,packet_count,byte_count,packet_count_per_second,packet_count_per_nsecond,byte_count_per_second,byte_count_per_nsecond,byte_per_packet\n')
@@ -369,7 +371,8 @@ class SimpleSwitch13(app_manager.RyuApp):
 		   'ip_proto': ip_proto, 'ip_src':ip_src, 'ip_dst': ip_dst, 'tp_src':tp_src, 'tp_dst':tp_dst, 'icmp_code': icmp_code, 'icmp_type':icmp_type
 		   }
 			# TODO need to send w.r.t datapath_id
-			
+			print("Stat: ")
+			print(stat)
 			flow_stats.append(stat)
 			
 

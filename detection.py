@@ -61,10 +61,13 @@ class Detection:
   #calc avg byte per sec for flows that appends in increased occupance rate times
   def calc_avg_bytes_per_sec(self, stats):
      byte_per_secs = [stat['byte_count_per_second'] for stat in stats]
-     mean = statistics.mean(byte_per_secs)
-     print("avg byte per sec: ")
-     print(mean)
-     return mean
+     if (byte_per_secs != []):
+        mean = statistics.mean(byte_per_secs)
+        print("avg byte per sec: ")
+        print(mean)
+        return mean
+     print("bombos")
+     return 0
 
   def high_rate_detection(self):
      pass
