@@ -58,6 +58,7 @@ class Switch:
 	flow_average_duration = 0
 	flow_average_byte_per_packet = 0
 	state = "Normal"
+	schedular_iteration = 0
 
 	history_batches = pd.DataFrame()
 
@@ -74,7 +75,7 @@ class Switch:
 		columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet', 'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev', 'packet_in_diff_arr']
 		self.history_batches = pd.DataFrame(columns=columns)
 		self.scheduler = BackgroundScheduler()
-		self.scheduler.add_job(self.flow_table_stats, 'interval', seconds=5)
+		self.scheduler.add_job(self.flow_table_stats, 'interval', seconds=1)
 		self.scheduler.start()
 
 	# this function calculates the flow's occupancy rate, if it is more than threshold -> it will add its time into the overload_timestamps
@@ -173,23 +174,28 @@ class Switch:
 			print('Packet_in too much')
 		return new_mean, new_std_dev, new_diff_arr
 
-	# This method may work every 5 seconds to keep track of the flow table 5sn
+	# This method may work every seconds to keep track of the flow table, it has a counter and when it reaches 5 (every 5 sec) it checks for low-rate attacks
 	def flow_table_stats(self):
 		print("flow_table_stats")
-		trigger_detection = Detection(switch=self, detection_type= Detection_TYPE.LOW_RATE.value, switch_app=self.switch_app) # call it
-		self.detections.append(trigger_detection)
-		capacity_used = self.calc_occupance_rate()
-		flow_average_duration, flow_average_byte_per_packet = self.calc_removed_flows()
-		average_flow_duration_on_table = self.inspect_flow_table()
-		mean, std_dev, diff_arr = self.packet_in_rates_calc()
-		print(time.time(), capacity_used, flow_average_duration, flow_average_byte_per_packet, average_flow_duration_on_table, mean, std_dev, diff_arr)
-		self.history_batches.loc[len(self.history_batches)] = {'timestamp': time.time(), 'capacity_used': capacity_used, 'removed_flow_average_duration': flow_average_duration,
-																	'removed_flow_byte_per_packet': flow_average_byte_per_packet, 'average_flow_duration_on_table': average_flow_duration_on_table,
-																	'packet_in_mean': mean, 'packet_in_std_dev': std_dev, 'packet_in_diff_arr': diff_arr}
-		print(len(self.history_batches))
-		if(len(self.history_batches) > 15 ) : # write data to csv 
+		self.schedular_iteration += 1
+		if (self.schedular_iteration == 5):
+			self.schedular_iteration = 0
+			self.check_for_attacks(self, True)
+			capacity_used = self.calc_occupance_rate()
+			flow_average_duration, flow_average_byte_per_packet = self.calc_removed_flows()
+			average_flow_duration_on_table = self.inspect_flow_table()
+			mean, std_dev, diff_arr = self.packet_in_rates_calc()
+			print(time.time(), capacity_used, flow_average_duration, flow_average_byte_per_packet, average_flow_duration_on_table, mean, std_dev, diff_arr)
+			self.history_batches.loc[len(self.history_batches)] = {'timestamp': time.time(), 'capacity_used': capacity_used, 'removed_flow_average_duration': flow_average_duration,
+																		'removed_flow_byte_per_packet': flow_average_byte_per_packet, 'average_flow_duration_on_table': average_flow_duration_on_table,
+																		'packet_in_mean': mean, 'packet_in_std_dev': std_dev, 'packet_in_diff_arr': diff_arr}
 			print(len(self.history_batches))
-			self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
+			if(len(self.history_batches) > 15 ) : # write data to csv 
+				print(len(self.history_batches))
+				self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
+		else:
+			self.check_for_attacks(self, False)
+		
 
 	# checks whether flow count exceed capacity 
 	# TODO convert it to length of flow_table if it works fine
@@ -320,7 +326,7 @@ class Switch:
 		if (self.check_previous_occupancy_rates(self)):
 			if (self.check_removed_flows(self)):
 				return True
-		
+				
 		return False
 	
 	# get stats from controller's _flow_stats_reply_handler, detection type can be low_rate or high_rate
@@ -329,7 +335,17 @@ class Switch:
 		if (self.detections != []):
 			calling_detection_module = self.detections[-1] # call the lately running detection module
 			if (calling_detection_module.detection_type == Detection_TYPE.LOW_RATE.value):
-				stats_in_increased_occupancy_rate = [stat for stat in stats if stat['duration'] < 20]
+				stats_in_increased_occupancy_rate = [stat for stat in stats if stat['duration'] < 5*4]
 				calling_detection_module.start_low_rate_detection(stats_in_increased_occupancy_rate, stats)
 
+	# it checks whether it's under attack, if so it will start detection module
+	def check_for_attacks(self, check_for_both):
+		if (self.is_high_rate_attack()):
+			trigger_detection = Detection(switch=self, detection_type= Detection_TYPE.HIGH_RATE.value, switch_app=self.switch_app) 
+			self.detections.append(trigger_detection)
+		# when check for both high (every sec) and low rate attacks (every 5s)
+		if (check_for_both):
+			if (self.is_low_rate_attack()):
+				trigger_detection = Detection(switch=self, detection_type= Detection_TYPE.LOW_RATE.value, switch_app=self.switch_app) 
+				self.detections.append(trigger_detection)
 

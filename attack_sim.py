@@ -35,16 +35,16 @@ class malicious_host():
     
     count = 0
     idle_timeout = 10
-    while( count<80):
-      for i in range(10):
+    while( count<80): # appended new fşpws
+      for i in range(10): # generate 10 random attacks
         attack_port = randint(80, 65000)
         attack = f'hping3 -c 2 -S -p {attack_port} -s 5002 {victim_ip}'
         self.attacks.append(attack)
-      for j in self.attacks:
+      for j in self.attacks: # store them to send them again (to live in flow_table)
         self.net.cmd(j)
       count = len(self.attacks)
       print(len(self.attacks))
-      sleep(4)
+      sleep(4) # sleep for 4 sec
     
     # different source ip
     # TODO thıs attack needs real Ip addresses from SDN
