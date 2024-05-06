@@ -17,9 +17,8 @@ def ip_generator(number_of_hosts=2):
 def traffic(net: Mininet, number_of_hosts=2):
     hosts = []
     for i in range(1, number_of_hosts+1):
-        hosts.append(net.get('h%s' % i))
-
-    
+        hosts.append(net.get(f'h{i}'))
+        
     print("--------------------------------------------------------------------------------")    
     print("Generating traffic ...")    
     hosts[0].cmd('python3 -m http.server 80 &')
@@ -31,14 +30,15 @@ def traffic(net: Mininet, number_of_hosts=2):
     for i in range(2): # how many times you would simulate the traffic
         
         print("--------------------------------------------------------------------------------")    
-        print("Iteration n {} ...".format(i+1))
         print("--------------------------------------------------------------------------------") 
         
         for j in range(number_of_hosts):
             src = choice(hosts)
+            print(src)
             dst = ip_generator(number_of_hosts)
+            print(dst)
 
-            print(f"generating ICMP traffic between {src} and h%s and TCP/UDP traffic between %s and h1" % (src,((dst.split('.'))[3]),src))
+            print(f"generating ICMP traffic between {src} and h%s and TCP/UDP traffic between  and h1" )
             src.cmd(f"ping {dst} -c 10 &")
             src.cmd("iperf -p 5050 -c 10.0.0.1")
             src.cmd("iperf -p 5051 -u -c 10.0.0.1")
