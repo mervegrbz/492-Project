@@ -19,8 +19,6 @@ def traffic(net: Mininet):
     h1 = net.get('h1')
     h2 = net.get('h2')
 
-   
-    
     hosts = [h1, h2]    
     print("--------------------------------------------------------------------------------")    
     print("Generating traffic ...")    
@@ -30,7 +28,7 @@ def traffic(net: Mininet):
     sleep(2)
     
     
-    for i in range(6): # how many times you would simulate the traffic
+    for i in range(2): # how many times you would simulate the traffic
         
         print("--------------------------------------------------------------------------------")    
         print("Iteration n {} ...".format(i+1))
@@ -39,19 +37,16 @@ def traffic(net: Mininet):
         for j in range(2): # for randomness, we have 2 switches
             src = choice(hosts)
             dst = ip_generator()
+            print(dst)
+            print(src)
             
-            if j <9:
-                print("generating ICMP traffic between %s and h%s and TCP/UDP traffic between %s and h1" % (src,((dst.split('.'))[3]),src))
-                src.cmd("ping {} -c 100 &".format(dst)) # send 100 times, & means not stop the terminal it would continue to swipe
-                src.cmd("iperf -p 5050 -c 10.0.0.1")
-                src.cmd("iperf -p 5051 -u -c 10.0.0.1")
-            else:
-                print("generating ICMP traffic between %s and h%s and TCP/UDP traffic between %s and h1" % (src,((dst.split('.'))[3]),src))
-                src.cmd("ping {} -c 100".format(dst)) # 
-                src.cmd("iperf -p 5050 -c 10.0.0.1") # for tcp server
-                src.cmd("iperf -p 5051 -u -c 10.0.0.1") # for udp server
-            
-            # print("%s Downloading index.html from h1" % src) #for http server
+        
+            print("generating ICMP traffic between %s and h%s and TCP/UDP traffic between %s and h1" % (src,((dst.split('.'))[3]),src))
+            src.cmd(f"ping {dst} -c 10 &") # send 10 times, & means not stop the terminal it would continue to swipe
+            src.cmd("iperf -p 5050 -c 10.0.0.1")
+            src.cmd("iperf -p 5051 -u -c 10.0.0.1")
+        
+            # print("%s Downloading index.html from h1" % src)
             # src.cmd("wget http://10.0.0.1/index.html")
             # print("%s Downloading test.zip from h1" % src)
             # src.cmd("wget http://10.0.0.1/test.zip")
