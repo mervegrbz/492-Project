@@ -6,7 +6,6 @@ import pandas as pd
 import data_classes as data_model
 from detection import *
 import statistics
-from switch import *
 from typing import List
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -62,9 +61,10 @@ class Switch:
 
 	history_batches = pd.DataFrame()
 
-	def __init__(self, connection_time, datapath_id, n_buffers, n_tables, capabilities, switch_app: SimpleSwitch13):
+	def __init__(self, connection_time, datapath_id, n_buffers, n_tables, capabilities, datapath, switch_app):
 		self.connection_time = connection_time
 		self.switch_app = switch_app # for calling its function
+		self.datapath = datapath # for calling send request
 		self.datapath_id = datapath_id
 		self.n_buffers = n_buffers
 		self.n_tables = n_tables
@@ -176,7 +176,7 @@ class Switch:
 	# This method may work every 5 seconds to keep track of the flow table 5sn
 	def flow_table_stats(self):
 		print("flow_table_stats")
-		trigger_detection = Detection(switch=self@Switch, detection_type= Detection_TYPE.GENERAL.value, switch_app=self.switch_app) # call it
+		trigger_detection = Detection(switch=self, detection_type= Detection_TYPE.LOW_RATE.value, switch_app=self.switch_app) # call it
 		capacity_used = self.calc_occupance_rate()
 		flow_average_duration, flow_average_byte_per_packet = self.calc_removed_flows()
 		average_flow_duration_on_table = self.inspect_flow_table()
@@ -195,7 +195,7 @@ class Switch:
 	def exceed_capacity(self):
 		isExceed = ((self.flow_mods + 1 - self.flow_removed)/self.capacity) > CAPACITY_THRESHOLD
 		if (isExceed):
-			trigger_detection = Detection(switch=self@Switch, detection_type= Detection_TYPE.GENERAL.value, switch_app=self.switch_app)
+			trigger_detection = Detection(switch=self, detection_type= Detection_TYPE.GENERAL.value, switch_app=self.switch_app)
 			self.detections.append(trigger_detection)
 		return isExceed
 	

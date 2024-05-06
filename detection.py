@@ -1,7 +1,5 @@
 from enum import Enum
-from switch_class import *
 from typing import List
-from switch import *
 
 # enumaration type of detection
 class Detection_TYPE(Enum):
@@ -15,7 +13,12 @@ class Detection:
   detection_type = 1
 
   # initialize detection with switch and the detection type
-  def __init__(self, switch: Switch, detection_type: int, switch_app:SimpleSwitch13):
+  def __init__(self, switch, detection_type, switch_app):
+    from switch_class import Switch  # Import here to avoid circular dependency at module load
+    assert isinstance(switch, Switch)
+    from switch import SimpleSwitch13  # Import here to avoid circular dependency at module load
+    assert isinstance(switch_app, SimpleSwitch13)
+    print("init-detection")
     self.switch = switch
     self.detection_type = detection_type
     self.switch_app = switch_app
@@ -31,6 +34,7 @@ class Detection:
   
 
   def low_rate_detection(self):
+     print("low_rate_detection")
      removed_flows_enter_times = [rf.timestamp-rf.duration_nsec for rf in self.switch.flow_removed] # TODO check 
      removed_flows_removed_times = [rf.timestamp for rf in self.switch.flow_removed]
      occupancy_rates = [o_r.occupancy_rate for o_r in self.switch.occupancy_rates]
@@ -42,7 +46,8 @@ class Detection:
      return True
   
   def start_low_rate_detection(self):
-     self.switch_app.send_flow_stats_request(self.switch.datapath_id),
+     print("start_low_rate_detection")
+     self.switch_app.send_flow_stats_request(self.switch.datapath)
      # TODO how much we need to wait for stats?
      # what about saving detections in a list, and trigger its method? Seems ok I think
 

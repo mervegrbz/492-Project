@@ -63,7 +63,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 			n_tables = ev.msg.n_tables
 			capabilities = ev.msg.capabilities
 
-			switch = switch_class.Switch(timestamp, datapath_id, n_buffers, n_tables, capabilities, self)
+			switch = switch_class.Switch(timestamp, datapath_id, n_buffers, n_tables, capabilities, datapath, self)
 			# adding switch to the switch list with its datapath_id
 			self.switch_list[datapath_id] = switch
 
@@ -277,6 +277,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 		flow_list.append({'type': 'ERROR', 'timestamp': ev.timestamp, 'datapath_id': dp.id, 'reason': reason, 'eth_src': eth.src, 'eth_dst': eth.dst, "data": error_data, "error_code": error_code})
 
 	# this will trigger when EventOFPStatsReply comes? 
+	"""
 	@set_ev_cls(ofp_event.EventOFPStatsReply, MAIN_DISPATCHER)
 	def stats_reply_handler(self, ev):
 		print("stats_reply_handler")
@@ -287,28 +288,30 @@ class SimpleSwitch13(app_manager.RyuApp):
 		if msg.type == ofp.OFPST_FLOW:
 			self.flow_stats_reply_handler(body)
 
-	# when responses comes from switches after sending flow stats request, this function will be triggered
-	def flow_stats_reply_handler(self, body):
+	"""
+	
+	@set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
+	def flow_stats_reply_handler(self, ev):
 		print("flow_stats_reply_handler")
 		flows = []
-		for stat in body:
-				flows.append('table_id=%s '
-											'duration_sec=%d duration_nsec=%d '
-											'priority=%d '
-											'idle_timeout=%d hard_timeout=%d '
-											'cookie=%d packet_count=%d byte_count=%d '
-											'match=%s instructions=%s' %
-											(stat.table_id,
-											stat.duration_sec, stat.duration_nsec,
-											stat.priority,
-											stat.idle_timeout, stat.hard_timeout,
-											stat.cookie, stat.packet_count, stat.byte_count,
-											stat.match, stat.instructions))
-		print('FlowStats: %s', flows)
+		for stat in ev.msg.body:
+			flows.append('table_id=%s '
+						'duration_sec=%d duration_nsec=%d '
+						'priority=%d '
+						'idle_timeout=%d hard_timeout=%d flags=0x%04x '
+						'cookie=%d packet_count=%d byte_count=%d '
+						'match=%s instructions=%s' %
+						(stat.table_id,
+						stat.duration_sec, stat.duration_nsec,
+						stat.priority,
+						stat.idle_timeout, stat.hard_timeout, stat.flags,
+						stat.cookie, stat.packet_count, stat.byte_count,
+						stat.match, stat.instructions))
 		self.logger.debug('FlowStats: %s', flows)
 
 	# this will send flow stats request to the switches (it will used in getting requests at detection)
 	def send_flow_stats_request(self, datapath):
+		print("send_flow_stats_request")
 		ofp = datapath.ofproto
 		ofp_parser = datapath.ofproto_parser
 
