@@ -41,7 +41,7 @@ class Detection:
      removed_flows_enter_times = [rf.timestamp-rf.duration_nsec for rf in self.switch.flow_removed] # TODO check 
      removed_flows_removed_times = [rf.timestamp for rf in self.switch.flow_removed]
      occupancy_rates = [o_r.occupancy_rate for o_r in self.switch.occupancy_rates]
-     if (self.is_low_rate(removed_enter_times=removed_flows_enter_times,  removed_removing_times=removed_flows_removed_times, packet_in_counts=self.switch.packet_in_counts_in_sec, occupancy_rates=occupancy_rates)):
+     if (self.is_low_rate(removed_enter_times=removed_flows_enter_times,  removed_removing_times=removed_flows_removed_times, packet_in_counts=self.switch.packet_in_rates, occupancy_rates=occupancy_rates)):
         self.switch_app.send_flow_stats_request(self.switch.datapath)
      
   # ml algorithm for detecting whether it is a low rate attack

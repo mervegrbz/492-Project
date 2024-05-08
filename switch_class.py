@@ -180,10 +180,14 @@ class Switch:
 	# This method may work every seconds to keep track of the flow table, it has a counter and when it reaches 5 (every 5 sec) it checks for low-rate attacks
 	def flow_table_stats(self):
 		self.schedular_iteration += 1
-		if (self.schedular_iteration == 5):
+		if (self.schedular_iteration >= 5):
 			print("flow_table_stats")
-			print("flow_table: ")
-			print(self.flow_table)
+			#print("flow_table: ")
+			#print(self.flow_table)
+			print("dummy get stats from schedular")
+			trigger_detection = Detection(switch=self, detection_type= Detection_TYPE.LOW_RATE.value, switch_app=self.switch_app) 
+			self.detections.append(trigger_detection)
+
 			self.schedular_iteration = 0
 			self.check_for_attacks(True)
 			capacity_used = self.calc_occupance_rate()
