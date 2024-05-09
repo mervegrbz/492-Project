@@ -7,7 +7,7 @@ import data_classes as data_model
 from detection import *
 import statistics
 from typing import List
-
+from detector import get_flow_table_stats
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
@@ -16,6 +16,8 @@ MEAN_THRESHOLD = 0.1
 LOWER_THRESHOLD_STD_DEV = 0.01
 CAPACITY_THRESHOLD = 0.8
 
+HIGH_RATE_FLAG = False
+LOW_RATE_FLAG = False
 
 
 # we may arrange it w.r.t official document https://ryu.readthedocs.io/en/latest/ofproto_v1_3_ref.html command enumaration
@@ -35,6 +37,7 @@ class FLOW_OPERATION(Enum):
 # this is a switch class, to monitor the switch's features without getting from stat request
 class Switch:
 	# lists
+	datapath  = None # datapath of the switch
 	packet_ins = [] # packet_in list, we can use it to store its mac address first,  when we get the flow_mod, updating the flow table w.r.t this and flow mod would be ben eficial.
 	flow_table = [] # flows with features from merging packet_in's and add_flow events
 	flow_removed = [] # flows that are removed from table, that will use in averages of flows existing
@@ -43,7 +46,6 @@ class Switch:
 	packet_in_counts_in_sec = [] # this is for comparing packet in count in a sec to compare whether there is a high-rate attack
 	overload_timestamps = []
 	detections = [] # for sending stat request's results to the corresponding detection module
-
 	connection_time = 0
 	datapath_id = 0 # switch's id
 	n_buffers = 0 
@@ -72,7 +74,7 @@ class Switch:
 		self.capabilities = capabilities
 		self.capacity = capabilities * n_tables #TODO we design it as 50 for tables capabilities
 		self.packet_in_rates = []
-		columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet', 'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev', 'packet_in_diff_arr']
+		columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet', 'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev']
 		self.history_batches = pd.DataFrame(columns=columns)
 		self.scheduler = BackgroundScheduler()
 		self.scheduler.add_job(self.flow_table_stats, 'interval', seconds=1)
@@ -82,12 +84,12 @@ class Switch:
 	# returns the occupancy rate of the switch
 	def calc_occupance_rate(self):
 		# TODO reason should be add
-		used_capacity = self.flow_mods - self.n_flow_removed # flow count of the switch
+		used_capacity = len(self.flow_table)
 		if ((used_capacity / self.capacity) > CAPACITY_THRESHOLD):
 			overload_time = time.time()
 			self.overload_timestamps.append(overload_time)
 			print("Switch %s is overloaded" % self.datapath_id)
-	
+
 		current_occupancy_rate = data_model.OccupancyRate(used_capacity / self.capacity,time.time())
 		self.occupancy_rates.append(current_occupancy_rate)
 		return used_capacity / self.capacity
@@ -130,12 +132,12 @@ class Switch:
 	# this function calculates average duration of flows in the flow table
 	def inspect_flow_table(self):
 		total_duration = 0
-
 		for flow in self.flow_table:
 			now = time.time()
 			total_duration += now - flow.timestamp
 		average_duration =   total_duration/len(self.flow_table) if len(self.flow_table) > 0 else 0
 		print("Average duration of flows in flow table is %s" % average_duration)
+
 		return average_duration
 
 	# This method calculates statistics of occupancy rates
@@ -152,10 +154,8 @@ class Switch:
 		new_std_dev = np.std(new_diff_arr)
 		new_mean = np.mean(new_diff_arr)
 
-		if abs(new_mean - mean) > MEAN_THRESHOLD:
-			print("Mean threshold exceeded")
-			print('Switch table load fast')
 
+		
 	# TODO packet_ins should be used to use that, when we calculate rate, we need to remove all elements from the list.
 	# TODO we shouldn't remove packet_in if its flow_add isn't called yet to updating flow table correspondingly
 	def packet_in_rates_calc(self):
@@ -169,7 +169,7 @@ class Switch:
 		new_std_dev = np.std(new_diff_arr)
 		new_mean = np.mean(new_diff_arr)
 
-		if abs(new_mean - mean) > MEAN_THRESHOLD:
+		if (new_mean - mean) > MEAN_THRESHOLD:
 			print("Mean threshold exceeded")
 			print('Packet_in too much')
 		return new_mean, new_std_dev, new_diff_arr
@@ -180,7 +180,7 @@ class Switch:
 		self.schedular_iteration += 1
 		if (self.schedular_iteration == 5):
 			self.schedular_iteration = 0
-			self.check_for_attacks(self, True)
+			self.check_for_attacks(True)
 			capacity_used = self.calc_occupance_rate()
 			flow_average_duration, flow_average_byte_per_packet = self.calc_removed_flows()
 			average_flow_duration_on_table = self.inspect_flow_table()
@@ -189,12 +189,16 @@ class Switch:
 			self.history_batches.loc[len(self.history_batches)] = {'timestamp': time.time(), 'capacity_used': capacity_used, 'removed_flow_average_duration': flow_average_duration,
 																		'removed_flow_byte_per_packet': flow_average_byte_per_packet, 'average_flow_duration_on_table': average_flow_duration_on_table,
 																		'packet_in_mean': mean, 'packet_in_std_dev': std_dev, 'packet_in_diff_arr': diff_arr}
-			print(len(self.history_batches))
+			
+			##TODO call the flow_mod_statistics method
+			## detector.flow_mod_statistics(self.flow_table)
+			get_flow_table_stats(self.history_batches)
+			
+
 			if(len(self.history_batches) > 15 ) : # write data to csv 
-				print(len(self.history_batches))
 				self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
 		else:
-			self.check_for_attacks(self, False)
+			self.check_for_attacks( False)
 		
 
 	# checks whether flow count exceed capacity 
