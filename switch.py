@@ -93,9 +93,9 @@ class SimpleSwitch13(app_manager.RyuApp):
 				mod = ofp_parser.OFPFlowMod(datapath, cookie=0, cookie_mask=0, table_id=0, command=ofp.OFPFC_ADD, idle_timeout=idle_timeout, hard_timeout=0,
 																		priority=priority, out_port=ofp.OFPP_ANY, out_group=ofp.OFPG_ANY,
 																		flags=ofp.OFPFF_SEND_FLOW_REM, match=match, instructions=inst)
-
+			match_obj = {i['OXMTlv']['field']: i['OXMTlv']['value'] for i in mod.match.to_jsondict()['OFPMatch']["oxm_fields"] }
 			flow_mod = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id,
-												'match': mod.match, 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags,
+												'match':match_obj, 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags,
 												'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout,
 												'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port}
 			flow_list.append(flow_mod)
@@ -104,7 +104,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 			switch = self.switch_list[datapath.id]
 			flow = datamodel.FlowMod(datapath_id=datapath.id, timestamp=timestamp, match=mod.match, command=mod.command, flags=mod.flags, idle_timeout=mod.idle_timeout, hard_timeout=mod.hard_timeout,
 						   priority=mod.priority, buffer_id = mod.buffer_id, out_port = mod.out_port, cookie=mod.cookie)
-			switch.update_flow_table(flow, switch_class.FLOW_OPERATION.ADD)
+			switch.update_flow_table(flow_mod, switch_class.FLOW_OPERATION.ADD)
 			#switch.update_flow_table({k: v for k, v in flow_mod.items() if k != 'type'}, switch_class.FLOW_OPERATION.ADD)
 
 	# writing logs
@@ -123,12 +123,13 @@ class SimpleSwitch13(app_manager.RyuApp):
 			mod = parser.OFPFlowMod(datapath=datapath, buffer_id=buffer_id, flags=ofproto.OFPFF_SEND_FLOW_REM, priority=priority, match=match, instructions=inst)
 		else:
 			mod = parser.OFPFlowMod(datapath=datapath, priority=priority, flags=ofproto.OFPFF_SEND_FLOW_REM, match=match, instructions=inst)
-		flow_mod = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id, 'match': mod.match, 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags, 'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout, 'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port }
+		match_obj = {i['OXMTlv']['field']: i['OXMTlv']['value'] for i in mod.match.to_jsondict()['OFPMatch']["oxm_fields"] }
+		flow_mod = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id, 'match': match_obj, 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags, 'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout, 'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port }
 		flow_list.append(flow_mod)
 		switch = self.switch_list[datapath.id]
 		flow = datamodel.FlowMod(datapath_id=datapath.id, timestamp=timestamp, match=match, command=mod.command, flags=mod.flags, idle_timeout=mod.idle_timeout, hard_timeout=mod.hard_timeout,
 						   priority=mod.priority, buffer_id = mod.buffer_id, out_port = mod.out_port, cookie=mod.cookie)
-		switch.update_flow_table(flow, switch_class.FLOW_OPERATION.ADD)
+		# switch.update_flow_table(flow_mod, switch_class.FLOW_OPERATION.ADD)
 		datapath.send_msg(mod)
 
 	# When packet_in async messages comes from switch to the controller, it will trigger this function
@@ -225,6 +226,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 		timestamp = ev.timestamp
 		datapath_id = dp.id
 		match = msg.match
+		
 		cookie = msg.cookie
 		priority = msg.priority
 		duration_sec = msg.duration_sec
@@ -245,13 +247,14 @@ class SimpleSwitch13(app_manager.RyuApp):
 			reason = 'unknown'
 		# TODO check occupance rate of switch
 		# add this message into csv, increase n_removed_flows, update the flow table and add flow_removed to this flow
-		flow_removed_details = {'type': 'FLOWREMOVED', 'timestamp': timestamp, 'datapath_id': datapath_id, 'match': match, 'cookie': cookie, 'priority': priority,'duration_sec': duration_sec, 'duration_nsec': duration_nsec, 'idle_timeout': idle_timeout, 'packet_count': packet_count, 'byte_count': byte_count, 'reason': reason}
+		match_obj = {i['OXMTlv']['field']: i['OXMTlv']['value'] for i in match.to_jsondict()['OFPMatch']["oxm_fields"] }
+		flow_removed_details = {'type': 'FLOWREMOVED', 'timestamp': timestamp, 'datapath_id': datapath_id, 'match': match_obj, 'cookie': cookie, 'priority': priority,'duration_sec': duration_sec, 'duration_nsec': duration_nsec, 'idle_timeout': idle_timeout, 'packet_count': packet_count, 'byte_count': byte_count, 'reason': reason}
 		flow_list.append(flow_removed_details)
 		switch = self.switch_list[datapath_id]	
 		removed_flow = datamodel.FlowRemoved(datapath_id=datapath_id, timestamp=timestamp, match=match, idle_timeout=idle_timeout, 
 									   duration_sec=duration_sec,duration_nsec=duration_nsec, packet_count=packet_count,
 										 byte_count=byte_count, reason= reason, cookie=cookie, priority=priority)			   
-		switch.update_flow_table(removed_flow, switch_class.FLOW_OPERATION.DELETE)
+		switch.update_flow_table(flow_removed_details, switch_class.FLOW_OPERATION.DELETE)
 
 	# This function will trigger whenever an error messages comes into the controller
 	@set_ev_cls(ofp_event.EventOFPErrorMsg, [HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER, MAIN_DISPATCHER])
