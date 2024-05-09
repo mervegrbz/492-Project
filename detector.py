@@ -24,6 +24,8 @@ def get_occupancy_rate(data):
     last_capacity_derivative = capacity_derivatives.iloc[-1]
     if (last_capacity_derivative > mean_capacity_derivatives):
         print("High Rate Attack Detected")
+        HIGH_RATE_FLAG = True
+        
         return True
     
 def get_packet_in_rate(data):
@@ -32,12 +34,14 @@ def get_packet_in_rate(data):
     packet_in_rate_last_row = data['packet_in_rate'].iloc[-1]
     if (packet_in_rate_last_row > HIGH_RATE_THRESHOLD):
         print("High Rate Attack Detected")
+        HIGH_RATE_FLAG = True
         return True
     ## low rate attacks generally have low differences between the packet in rates if the packet in change rate is too regular then it can be a low rate attack
     ## check the entropy of the packet in rate
-    entropy = self.get_entropy(packet_in_rate)
+    entropy = get_entropy(packet_in_rate)
     if (entropy < 0.1):
         print("Low Rate Attack Detected")
+        LOW_RATE_FLAG = True
         return True
 
 def get_entropy(data):
@@ -60,13 +64,12 @@ def get_flow_table_stats(data):
     ## if the average flow duration is bigger then idle timeout and mean removed is bigger than then the now average flow duration then it can be a low rate attack
     if (average_flow_duration_on_table_last_row > 10 and  mean_removed - average_flow_duration_on_table_last_row > 5):
         print("Low Rate Attack Detected")
+        LOW_RATE_FLAG = True
         return True
 
 
-        
-        
-        
-        
+
+      
         
         
         

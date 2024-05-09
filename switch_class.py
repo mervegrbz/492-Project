@@ -189,9 +189,9 @@ class Switch:
 	def flow_mod_statistics(self): 
 		stats = [] # ip_proto value counts
 		## ip_proto can be 1 2 3 
-		ip_proto  = [i['ip_proto'] for i in self.flow_table['match']]
-		ip_src = [i['ipv4_src'] for i in self.flow_table['match']]
-		ip_dst = [i['ipv4_dst'] for i in self.flow_table['match']]
+		ip_proto  = [i['match']['ip_proto'] for i in self.flow_table]
+		ip_src = [i['match']['ipv4_src'] for i in self.flow_table]
+		ip_dst = [i['match']['ipv4_dst'] for i in self.flow_table]
 		
 		count_dict = self.count_unique(ip_proto)
 		stats.append(count_dict)
@@ -213,14 +213,14 @@ class Switch:
 			flow_average_duration, flow_average_byte_per_packet = self.calc_removed_flows()
 			average_flow_duration_on_table = self.inspect_flow_table()
 			mean, std_dev, diff_arr = self.packet_in_rates_calc()
-			print(time.time(), capacity_used, flow_average_duration, flow_average_byte_per_packet, average_flow_duration_on_table, mean, std_dev, diff_arr)
+			print(time.time(), capacity_used, flow_average_duration, flow_average_byte_per_packet, average_flow_duration_on_table, mean, std_dev)
 			self.history_batches.loc[len(self.history_batches)] = {'timestamp': time.time(), 'capacity_used': capacity_used, 'removed_flow_average_duration': flow_average_duration,
 																		'removed_flow_byte_per_packet': flow_average_byte_per_packet, 'average_flow_duration_on_table': average_flow_duration_on_table,
 																		'packet_in_mean': mean, 'packet_in_std_dev': std_dev}
 			##TODO call the flow_mod_statistics method
 			## self.flow_mod_statistics(self.flow_table)
 			get_flow_table_stats(self.history_batches)
-			flow_mod_statistics(self.flow_table)
+			stats = self.flow_mod_statistics()
 		
 			if(len(self.history_batches) > 15 ) : # write data to csv 
 				self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
