@@ -6,19 +6,9 @@ import pandas as pd
 import data_classes as data_model
 from detection import *
 import statistics
-from typing import List
 from detector import get_flow_table_stats
-from parameters import TABLE_CAPACITY
+from parameters import TABLE_CAPACITY, UPPER_THRESHOLD_STD_DEV, MEAN_THRESHOLD, LOWER_THRESHOLD_STD_DEV, CAPACITY_THRESHOLD, HIGH_RATE_FLAG, LOW_RATE_FLAG
 from apscheduler.schedulers.background import BackgroundScheduler
-
-
-UPPER_THRESHOLD_STD_DEV = 0.1
-MEAN_THRESHOLD = 0.1
-LOWER_THRESHOLD_STD_DEV = 0.01
-CAPACITY_THRESHOLD = 0.8
-
-HIGH_RATE_FLAG = False
-LOW_RATE_FLAG = False
 
 
 # we may arrange it w.r.t official document https://ryu.readthedocs.io/en/latest/ofproto_v1_3_ref.html command enumaration
@@ -48,6 +38,7 @@ class Switch:
 	overload_timestamps = []
 	detections = [] # for sending stat request's results to the corresponding detection module
 	connection_time = 0
+	n_errors = 0
 	datapath_id = 0 # switch's id
 	n_buffers = 0 
 	n_tables = 0 # number of flow tables in the switch
@@ -57,8 +48,6 @@ class Switch:
 	flow_id = 0 # this will help us to match packet_in and OFPFC_ADD messages, update the table correspondingly
 	capabilities = 0 # flow capabilities of flow tables
 	idle_timeout = 10
-	flow_average_byte_per_packet = 0
-	state = "Normal"
 	schedular_iteration = 0
 
 	def __init__(self, connection_time, datapath_id, n_buffers, n_tables, capabilities, datapath, switch_app):
@@ -72,7 +61,7 @@ class Switch:
 		self.capacity = TABLE_CAPACITY
 		self.packet_in_rates = []
 		columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet',
-             'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev',
+             'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev', 'number_of_errors'
              'flow_table_stats', 'removed_table_stats']
 		self.history_batches = pd.DataFrame(columns=columns)
 		self.scheduler = BackgroundScheduler()
@@ -97,8 +86,7 @@ class Switch:
 	# it calculates and returns flow_average_duration, flow_average_byte_per_packet
 	def calc_removed_flows(self):
 		average_duration = 0
-		average_byte_per_packet = 0
-			
+		average_byte_per_packet = 0	
 		# TODO get the last N elements of the removed flows to monitor change
 		for flow in self.flow_removed:
 			duration_sec = flow['duration_sec']
@@ -117,6 +105,8 @@ class Switch:
 	# else if it's delete, delete it from the table by using its match criteria
 	def update_flow_table(self, current_flow, operation):
 		if operation == FLOW_OPERATION.ADD:
+				if(len(self.flow_table)>=self.capacity):
+					return
 				self.flow_table.append(current_flow)
 				self.flow_mods += 1
 		elif operation == FLOW_OPERATION.DELETE:
@@ -131,8 +121,8 @@ class Switch:
 		total_duration = 0
 		for flow in self.flow_table:
 			now = time.time()
-			total_duration += now - flow['timestamp']
-		average_duration =   total_duration/len(self.flow_table) if len(self.flow_table) > 0 else 0
+			total_duration += now - int(flow['timestamp'])
+		average_duration = total_duration/len(self.flow_table) if len(self.flow_table) > 0 else 0
 		return average_duration
 
 	# TODO packet_ins should be used to use that, when we calculate rate, we need to remove all elements from the list.
@@ -194,10 +184,9 @@ class Switch:
 			print(time.time(), capacity_used, flow_average_duration, flow_average_byte_per_packet, average_flow_duration_on_table, mean, std_dev)
 			self.history_batches.loc[len(self.history_batches)] = {'timestamp': time.time(), 'capacity_used': capacity_used, 'removed_flow_average_duration': flow_average_duration,
 																		'removed_flow_byte_per_packet': flow_average_byte_per_packet, 'average_flow_duration_on_table': average_flow_duration_on_table,
-																		'packet_in_mean': mean, 'packet_in_std_dev': std_dev, 'flow_table_stats': flow_table_stats, 'removed_table_stats': removed_table_stats }
+																		'packet_in_mean': mean, 'packet_in_std_dev': std_dev,'number_of_errors': self.n_errors ,'flow_table_stats': flow_table_stats, 'removed_table_stats': removed_table_stats }
 			##TODO call the flow_mod_statistics method
 			get_flow_table_stats(self.history_batches)
-		
 			if(len(self.history_batches) > 15 ) : # write data to csv 
 				self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
 

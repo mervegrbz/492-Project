@@ -59,11 +59,12 @@ class malicious_host():
     victim_ip = '10.0.0.2' #ip_generator(number_of_hosts)
     count = 0
     while( count<attack_number):
-      attack_port = randint(80, 65000)
+      sleep(attack_interval)
       for i in range(10):
+        attack_port = randint(80, 65000)
         attack = f'hping3 -S -d 10 -s {attack_port} -p 80 -c 1 {victim_ip} &'
         self.attacks.append(attack)
       for j in self.attacks:
         self.net.cmd(j)
+        sleep(1)
       count = len(self.attacks)
-      sleep(attack_interval)

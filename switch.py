@@ -176,7 +176,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 		dst = eth.dst
 		src = eth.src
 		dpid = format(datapath.id, "d").zfill(16)
-
+  
 		self.mac_to_port.setdefault(dpid, {})
 		self.mac_to_port[dpid][src] = in_port
 
@@ -280,6 +280,8 @@ class SimpleSwitch13(app_manager.RyuApp):
 			reason = 'OFPET_QUEUE_OP_FAILED'
 		pkt = packet.Packet(msg.data)
 		eth = pkt.get_protocols(ethernet.ethernet)[0]
+		switch = self.switch_list[dp.id]
+		switch.n_errors+=1
 		flow_list.append({'type': 'ERROR', 'timestamp': ev.timestamp, 'datapath_id': dp.id, 'reason': reason, 'eth_src': eth.src, 'eth_dst': eth.dst, "data": error_data, "error_code": error_code})
 
 	# this will trigger when EventOFPStatsReply comes? 

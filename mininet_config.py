@@ -28,8 +28,6 @@ class MininetTopo():
     def config_switch(self):
         for switch in self.net.switches:
             self.master_node.cmdPrint('ovs-vsctl set bridge %s protocols=OpenFlow13' %switch)
-            # limit the flow table 
-            print(switch)
             self.master_node.cmdPrint(f'ovs-vsctl -- --id=@{switch} create Flow_Table flow_limit={TABLE_CAPACITY} overflow_policy=refuse -- set Bridge {switch} flow_tables=0=@{switch}')
     def pingAll(self):
         self.net.pingAll()
@@ -66,8 +64,6 @@ if __name__ == '__main__':
         else:
             print('Invalid topology')
             sys.exit(1)
-            
-    
     try:
         
         setLogLevel( 'debug' )
@@ -78,7 +74,7 @@ if __name__ == '__main__':
         h2 = topo.net.get('h2')
         h2.cmd('python3 -m http.server 80 &')
         malicious = attack_sim.malicious_host('h1',h1,10)
-        malicious.attack_controller_ip(3, 90 ,number_of_host_per_switch*number_of_switch )
+        malicious.attack_controller_ip(5, 60 ,number_of_host_per_switch*number_of_switch )
         # benign_traffic.traffic(topo.net, number_of_host_per_switch*number_of_switch )
         CLI( topo.net )
         print('CLI opened')
