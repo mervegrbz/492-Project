@@ -51,9 +51,10 @@ def get_entropy(data):
     return entropy
 
 def get_flow_table_stats(data):
-    columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet', 'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev']
-    ## get the last 5 data row and get their average _flow duration on table and removed flow average duration if average flow duration is increasing then  it can be low rate attack
-    ## if removed flow average duration and the average flow duration has a big difference then it can be a low rate attack
+    columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet',
+               'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev', 
+               'flow_table_stats', 'removed_table_stats' ]
+
     average_flow_duration_on_table = None
     if (len(data)> 5):
         average_flow_duration_on_table = data['average_flow_duration_on_table'].iloc[-5:]

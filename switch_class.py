@@ -8,7 +8,7 @@ from detection import *
 import statistics
 from typing import List
 from detector import get_flow_table_stats
-
+from parameters import TABLE_CAPACITY
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
@@ -54,14 +54,12 @@ class Switch:
 	n_packet_in = 0 # cumulative packet in count
 	n_flow_removed = 0 #TODO  is it required? isn't it same with len(flow_removed)
 	flow_mods = 0 # number of added flows into the table (OFPFC_ADD)
-	capacity = 0 # capacity of switch (number of flows that can be stored)
 	flow_id = 0 # this will help us to match packet_in and OFPFC_ADD messages, update the table correspondingly
 	capabilities = 0 # flow capabilities of flow tables
 	idle_timeout = 10
 	flow_average_byte_per_packet = 0
 	state = "Normal"
 	schedular_iteration = 0
-	history_batches = pd.DataFrame()
 
 	def __init__(self, connection_time, datapath_id, n_buffers, n_tables, capabilities, datapath, switch_app):
 		self.connection_time = connection_time
@@ -71,9 +69,11 @@ class Switch:
 		self.n_buffers = n_buffers
 		self.n_tables = n_tables
 		self.capabilities = capabilities
-		self.capacity = capabilities * n_tables #TODO we design it as 50 for tables capabilities
+		self.capacity = TABLE_CAPACITY
 		self.packet_in_rates = []
-		columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet', 'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev']
+		columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet',
+             'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev',
+             'flow_table_stats', 'removed_table_stats']
 		self.history_batches = pd.DataFrame(columns=columns)
 		self.scheduler = BackgroundScheduler()
 		self.scheduler.add_job(self.flow_table_stats, 'interval', seconds=1)
@@ -116,19 +116,13 @@ class Switch:
 	# this function updates the flow table, if the operation is ADD, append the flow into the flowtable,
 	# else if it's delete, delete it from the table by using its match criteria
 	def update_flow_table(self, current_flow, operation):
-		# current flow is a FlowMod
-		# print(operation, (self.flow_table))
-
 		if operation == FLOW_OPERATION.ADD:
 				self.flow_table.append(current_flow)
 				self.flow_mods += 1
-		# current flow is a FlowRemoved
 		elif operation == FLOW_OPERATION.DELETE:
 				for flow in self.flow_table:
-						print(flow)
 						if flow['match'] == current_flow['match']:
 								self.flow_table.remove(flow)
-								print(current_flow)
 								self.flow_removed.append(current_flow)
 								self.n_flow_removed += 1
 
@@ -139,26 +133,8 @@ class Switch:
 			now = time.time()
 			total_duration += now - flow['timestamp']
 		average_duration =   total_duration/len(self.flow_table) if len(self.flow_table) > 0 else 0
-		print("Average duration of flows in flow table is %s" % average_duration)
-
 		return average_duration
 
-	# This method calculates statistics of occupancy rates
-	# TODO: This method should be called by the scheduler
-	def occupancy_scheduler(self):
-		diff_arr = np.diff(self.occupancy_rates)
-		std_dev = np.std(diff_arr)
-		mean = np.mean(diff_arr)
-
-		occupancy_rate = len(self.flow_table)/self.capacity
-		self.occupancy_rates.append(occupancy_rate)
-
-		new_diff_arr = np.diff(self.occupancy_rates)
-		new_std_dev = np.std(new_diff_arr)
-		new_mean = np.mean(new_diff_arr)
-
-
-		
 	# TODO packet_ins should be used to use that, when we calculate rate, we need to remove all elements from the list.
 	# TODO we shouldn't remove packet_in if its flow_add isn't called yet to updating flow table correspondingly
 	def packet_in_rates_calc(self):
@@ -175,7 +151,7 @@ class Switch:
 		if (new_mean - mean) > MEAN_THRESHOLD:
 			print("Mean threshold exceeded")
 			print('Packet_in too much')
-		return new_mean, new_std_dev, new_diff_arr
+		return new_mean, new_std_dev
 
 	def count_unique(self, values):
 		count_dict = {}
@@ -186,12 +162,12 @@ class Switch:
 						count_dict[value] = 1
 		return count_dict
 
-	def flow_mod_statistics(self): 
+	def flow_mod_statistics(self, table): 
 		stats = [] # ip_proto value counts
 		## ip_proto can be 1 2 3 
-		ip_proto  = [i['match']['ip_proto'] for i in self.flow_table]
-		ip_src = [i['match']['ipv4_src'] for i in self.flow_table]
-		ip_dst = [i['match']['ipv4_dst'] for i in self.flow_table]
+		ip_proto  = [i['match']['ip_proto'] for i in table]
+		ip_src = [i['match']['ipv4_src'] for i in table]
+		ip_dst = [i['match']['ipv4_dst'] for i in table]
 		
 		count_dict = self.count_unique(ip_proto)
 		stats.append(count_dict)
@@ -212,15 +188,15 @@ class Switch:
 			capacity_used = self.calc_occupance_rate()
 			flow_average_duration, flow_average_byte_per_packet = self.calc_removed_flows()
 			average_flow_duration_on_table = self.inspect_flow_table()
-			mean, std_dev, diff_arr = self.packet_in_rates_calc()
+			mean, std_dev = self.packet_in_rates_calc()
+			flow_table_stats = self.flow_mod_statistics(self.flow_table)
+			removed_table_stats = self.flow_mod_statistics(self.flow_removed)
 			print(time.time(), capacity_used, flow_average_duration, flow_average_byte_per_packet, average_flow_duration_on_table, mean, std_dev)
 			self.history_batches.loc[len(self.history_batches)] = {'timestamp': time.time(), 'capacity_used': capacity_used, 'removed_flow_average_duration': flow_average_duration,
 																		'removed_flow_byte_per_packet': flow_average_byte_per_packet, 'average_flow_duration_on_table': average_flow_duration_on_table,
-																		'packet_in_mean': mean, 'packet_in_std_dev': std_dev}
+																		'packet_in_mean': mean, 'packet_in_std_dev': std_dev, 'flow_table_stats': flow_table_stats, 'removed_table_stats': removed_table_stats }
 			##TODO call the flow_mod_statistics method
-			## self.flow_mod_statistics(self.flow_table)
 			get_flow_table_stats(self.history_batches)
-			stats = self.flow_mod_statistics()
 		
 			if(len(self.history_batches) > 15 ) : # write data to csv 
 				self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
