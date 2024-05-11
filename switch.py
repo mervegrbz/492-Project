@@ -119,8 +119,8 @@ class SimpleSwitch13(app_manager.RyuApp):
 		flow_mod = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id, 'match': format_match(mod.match), 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags, 'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout, 'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port }
 		flow_list.append(flow_mod)
 		switch = self.switch_list[datapath.id]
-		flow = datamodel.FlowMod(datapath_id=datapath.id, timestamp=timestamp, match=mod.match, command=mod.command, flags=mod.flags, idle_timeout=mod.idle_timeout, hard_timeout=mod.hard_timeout,
-							 priority=mod.priority, buffer_id = mod.buffer_id, out_port = mod.out_port, cookie=mod.cookie)
+		# flow = datamodel.FlowMod(datapath_id=datapath.id, timestamp=timestamp, match=mod.match, command=mod.command, flags=mod.flags, idle_timeout=mod.idle_timeout, hard_timeout=mod.hard_timeout,
+		# 					 priority=mod.priority, buffer_id = mod.buffer_id, out_port = mod.out_port, cookie=mod.cookie)
 		# switch.update_flow_table(flow_mod, switch_class.FLOW_OPERATION.ADD)
 		datapath.send_msg(mod)
 	
@@ -131,7 +131,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 		timestamp = datetime.now()
 		match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=ip_src)
 		actions = []
-		self.add_flow(datapath, timestamp, 1, match, actions, hard_time=BAN_TIMEOUT) ## Hardtime is really important for blocking range 
+		self.add_flow(datapath, timestamp, 2, match, actions, hard_time=BAN_TIMEOUT) ## Hardtime is really important for blocking range 
 	## TODO hardtime as a parameter
 	
 	def drop_flow(self, datapath, cookie_num):
@@ -141,6 +141,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 			datapath=datapath,
 			cookie=cookie_num, ## cookie will help to match the flows
 			cookie_mask=0xFFFFFFFFFFFFFFFF,
+			priority = 2,
 			table_id=ofproto.OFPTT_ALL,
 			hard_timeout=BAN_TIMEOUT,
 			idle_timeout=BAN_TIMEOUT,

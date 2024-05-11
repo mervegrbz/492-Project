@@ -60,8 +60,9 @@ class Switch:
 		self.capabilities = capabilities
 		self.capacity = TABLE_CAPACITY
 		self.packet_in_rates = []
-		columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet',
-             'average_flow_duration_on_table', 'packet_in_rate', 'number_of_errors'
+		columns = ['timestamp', 'capacity_used', 
+             'removed_flow_average_duration', 'removed_flow_byte_per_packet',
+             'average_flow_duration_on_table', 'packet_in_rate', 'number_of_errors',
              'flow_table_stats', 'removed_table_stats']
 		self.history_batches = pd.DataFrame(columns=columns)
 		self.scheduler = BackgroundScheduler()
@@ -168,10 +169,9 @@ class Switch:
 																		'packet_in_rate': self.n_packet_in, 'number_of_errors': self.n_errors ,'flow_table_stats': flow_table_stats, 'removed_table_stats': removed_table_stats }
 			##TODO call the flow_mod_statistics method
 			get_flow_table_stats(self.history_batches)
-			if(len(self.history_batches) > 30 ) : # write data to csv 
+			if(len(self.history_batches) > 30 ) :
 				self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
 
-			# self.check_for_attacks( False)
 		
 	def get_related_batch(self, num_of_batch=5):
 		return self.history_batches[-num_of_batch:] if len(self.history_batches)>num_of_batch else self.history_batches
