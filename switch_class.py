@@ -7,7 +7,7 @@ import data_classes as data_model
 from detection import *
 import statistics
 from detector import get_flow_table_stats
-from parameters import TABLE_CAPACITY, UPPER_THRESHOLD_STD_DEV, MEAN_THRESHOLD, LOWER_THRESHOLD_STD_DEV, CAPACITY_THRESHOLD, HIGH_RATE_FLAG, LOW_RATE_FLAG
+from parameters import TABLE_CAPACITY, UPPER_THRESHOLD_STD_DEV, MEAN_THRESHOLD, LOWER_THRESHOLD_STD_DEV, CAPACITY_THRESHOLD, HIGH_RATE_FLAG, LOW_RATE_FLAG, IDLE_TIMEOUT
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
@@ -47,7 +47,7 @@ class Switch:
 	flow_mods = 0 # number of added flows into the table (OFPFC_ADD)
 	flow_id = 0 # this will help us to match packet_in and OFPFC_ADD messages, update the table correspondingly
 	capabilities = 0 # flow capabilities of flow tables
-	idle_timeout = 10
+	idle_timeout = IDLE_TIMEOUT
 	schedular_iteration = 0
 
 	def __init__(self, connection_time, datapath_id, n_buffers, n_tables, capabilities, datapath, switch_app):
@@ -61,11 +61,11 @@ class Switch:
 		self.capacity = TABLE_CAPACITY
 		self.packet_in_rates = []
 		columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet',
-             'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev', 'number_of_errors'
+             'average_flow_duration_on_table', 'packet_in_rate', 'number_of_errors'
              'flow_table_stats', 'removed_table_stats']
 		self.history_batches = pd.DataFrame(columns=columns)
 		self.scheduler = BackgroundScheduler()
-		self.scheduler.add_job(self.flow_table_stats, 'interval', seconds=1)
+		self.scheduler.add_job(self.flow_table_stats, 'interval', seconds=5)
 		self.scheduler.start()
 
 	# this function calculates the flow's occupancy rate, if it is more than threshold -> it will add its time into the overload_timestamps
@@ -76,8 +76,8 @@ class Switch:
 		if ((used_capacity / self.capacity) > CAPACITY_THRESHOLD):
 			overload_time = time.time()
 			self.overload_timestamps.append(overload_time)
-			print("Switch %s is overloaded" % self.datapath_id)
-
+			# print("Switch %s is overloaded" % self.datapath_id)
+		print(len(self.flow_table))
 		current_occupancy_rate = data_model.OccupancyRate(used_capacity / self.capacity,time.time())
 		self.occupancy_rates.append(current_occupancy_rate)
 		return used_capacity / self.capacity
@@ -111,7 +111,7 @@ class Switch:
 				self.flow_mods += 1
 		elif operation == FLOW_OPERATION.DELETE:
 				for flow in self.flow_table:
-						if flow['match'] == current_flow['match']:
+						if flow['cookie'] == current_flow['cookie']:
 								self.flow_table.remove(flow)
 								self.flow_removed.append(current_flow)
 								self.n_flow_removed += 1
@@ -125,24 +125,6 @@ class Switch:
 		average_duration = total_duration/len(self.flow_table) if len(self.flow_table) > 0 else 0
 		return average_duration
 
-	# TODO packet_ins should be used to use that, when we calculate rate, we need to remove all elements from the list.
-	# TODO we shouldn't remove packet_in if its flow_add isn't called yet to updating flow table correspondingly
-	def packet_in_rates_calc(self):
-		diff_arr = np.diff(self.packet_in_rates)
-		std_dev = np.std(diff_arr)
-		mean = np.mean(diff_arr)
-
-		self.packet_in_rates.append(self.n_packet_in)
-
-		new_diff_arr = np.diff(self.packet_in_rates)
-		new_std_dev = np.std(new_diff_arr)
-		new_mean = np.mean(new_diff_arr)
-
-		if (new_mean - mean) > MEAN_THRESHOLD:
-			print("Mean threshold exceeded")
-			print('Packet_in too much')
-		return new_mean, new_std_dev
-
 	def count_unique(self, values):
 		count_dict = {}
 		for value in values:
@@ -153,11 +135,11 @@ class Switch:
 		return count_dict
 
 	def flow_mod_statistics(self, table): 
-		stats = [] # ip_proto value counts
-		## ip_proto can be 1 2 3 
-		ip_proto  = [i['match']['ip_proto'] for i in table]
-		ip_src = [i['match']['ipv4_src'] for i in table]
-		ip_dst = [i['match']['ipv4_dst'] for i in table]
+		stats = []
+
+		ip_proto  = [i['match']['ip_proto'] for i in table if 'ip_proto' in i['match']]
+		ip_src = [i['match']['ipv4_src'] for i in table if 'ipv4_src' in i['match']]
+		ip_dst = [i['match']['ipv4_dst'] for i in table if 'ipv4_dst' in i['match']]
 		
 		count_dict = self.count_unique(ip_proto)
 		stats.append(count_dict)
@@ -172,27 +154,28 @@ class Switch:
 	def flow_table_stats(self):
 		print("flow_table_stats")
 		self.schedular_iteration += 1
-		if (self.schedular_iteration == 5):
+		if (self.schedular_iteration == 1):
 			self.schedular_iteration = 0
 			# self.check_for_attacks(True)
 			capacity_used = self.calc_occupance_rate()
 			flow_average_duration, flow_average_byte_per_packet = self.calc_removed_flows()
 			average_flow_duration_on_table = self.inspect_flow_table()
-			mean, std_dev = self.packet_in_rates_calc()
 			flow_table_stats = self.flow_mod_statistics(self.flow_table)
 			removed_table_stats = self.flow_mod_statistics(self.flow_removed)
-			print(time.time(), capacity_used, flow_average_duration, flow_average_byte_per_packet, average_flow_duration_on_table, mean, std_dev)
+			print(time.time(), capacity_used, flow_average_duration, flow_average_byte_per_packet, average_flow_duration_on_table)
 			self.history_batches.loc[len(self.history_batches)] = {'timestamp': time.time(), 'capacity_used': capacity_used, 'removed_flow_average_duration': flow_average_duration,
 																		'removed_flow_byte_per_packet': flow_average_byte_per_packet, 'average_flow_duration_on_table': average_flow_duration_on_table,
-																		'packet_in_mean': mean, 'packet_in_std_dev': std_dev,'number_of_errors': self.n_errors ,'flow_table_stats': flow_table_stats, 'removed_table_stats': removed_table_stats }
+																		'packet_in_rate': self.n_packet_in, 'number_of_errors': self.n_errors ,'flow_table_stats': flow_table_stats, 'removed_table_stats': removed_table_stats }
 			##TODO call the flow_mod_statistics method
 			get_flow_table_stats(self.history_batches)
-			if(len(self.history_batches) > 15 ) : # write data to csv 
+			if(len(self.history_batches) > 30 ) : # write data to csv 
 				self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
 
 			# self.check_for_attacks( False)
 		
-
+	def get_related_batch(self, num_of_batch=5):
+		return self.history_batches[-num_of_batch:] if len(self.history_batches)>num_of_batch else self.history_batches
+   
 	# checks whether flow count exceed capacity 
 	# TODO convert it to length of flow_table if it works fine
 	def exceed_capacity(self):

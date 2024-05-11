@@ -9,7 +9,7 @@ from ryu.lib.packet import ether_types
 from ryu import utils
 import data_classes as datamodel
 from datetime import datetime
-from parameters import IDLE_TIMEOUT
+from parameters import IDLE_TIMEOUT, BAN_TIMEOUT
 import switch_class
 
 flow_list = []
@@ -24,16 +24,18 @@ def write_logs(batch_number, logs):
 						file.write(str(log) + '\n')
 
 def get_flow_number():
-  global flow_number
-  flow_number += 1 
-  return flow_number
-  
+	global flow_number
+	flow_number += 1 
+	return flow_number
+	
 def format_match(match):
-  return {i['OXMTlv']['field']: i['OXMTlv']['value'] for i in match.to_jsondict()['OFPMatch']["oxm_fields"] }
+	return {i['OXMTlv']['field']: i['OXMTlv']['value'] for i in match.to_jsondict()['OFPMatch']["oxm_fields"] }
 
 # a simple switch class from OpenFlow 1.3 documentation (https://github.com/faucetsdn/ryu/blob/master/ryu/app/simple_switch_13.py)
 class SimpleSwitch13(app_manager.RyuApp):
 	OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
+	banned_list = []
+	white_list = []
 
 	def __init__(self, *args, **kwargs):
 			super(SimpleSwitch13, self).__init__(*args, **kwargs)
@@ -103,35 +105,35 @@ class SimpleSwitch13(app_manager.RyuApp):
 
 	# When switch features comes to the controller (it comes when there is a new switch), a first flow append to the table
 	# We also append this to our flow_list to follow them
-	def add_flow(self, datapath, timestamp, priority, match, actions, buffer_id=None):
+	def add_flow(self, datapath, timestamp, priority, match, actions, hard_time=0, buffer_id=None):
 		ofproto = datapath.ofproto
 		parser = datapath.ofproto_parser
 		inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
 		mod = None
 		cookie_num = get_flow_number()
 		if buffer_id:
-			mod = parser.OFPFlowMod(datapath=datapath, cookie=cookie_num, cookie_mask=0xFFFFFFFFFFFFFFFF, buffer_id=buffer_id, flags=ofproto.OFPFF_SEND_FLOW_REM, priority=priority, match=match, instructions=inst)
+			mod = parser.OFPFlowMod(datapath=datapath, cookie=cookie_num, cookie_mask=0xFFFFFFFFFFFFFFFF, buffer_id=buffer_id, flags=ofproto.OFPFF_SEND_FLOW_REM, priority=priority, match=match, instructions=inst, hard_timeout = hard_time)
 		else:
-			mod = parser.OFPFlowMod(datapath=datapath, cookie=cookie_num, cookie_mask=0xFFFFFFFFFFFFFFFF, priority=priority, flags=ofproto.OFPFF_SEND_FLOW_REM, match=match, instructions=inst)
+			mod = parser.OFPFlowMod(datapath=datapath, cookie=cookie_num, cookie_mask=0xFFFFFFFFFFFFFFFF, priority=priority, flags=ofproto.OFPFF_SEND_FLOW_REM, match=match, instructions=inst, hard_timeout = hard_time)
 		
 		flow_mod = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id, 'match': format_match(mod.match), 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags, 'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout, 'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port }
 		flow_list.append(flow_mod)
 		switch = self.switch_list[datapath.id]
 		flow = datamodel.FlowMod(datapath_id=datapath.id, timestamp=timestamp, match=mod.match, command=mod.command, flags=mod.flags, idle_timeout=mod.idle_timeout, hard_timeout=mod.hard_timeout,
 							 priority=mod.priority, buffer_id = mod.buffer_id, out_port = mod.out_port, cookie=mod.cookie)
-		switch.update_flow_table(flow_mod, switch_class.FLOW_OPERATION.ADD)
+		# switch.update_flow_table(flow_mod, switch_class.FLOW_OPERATION.ADD)
 		datapath.send_msg(mod)
-  
-  ## Function adds a empty action that implies the dropping the packets coming from related ip_src
+	
+	## Function adds a empty action that implies the dropping the packets coming from related ip_src
 	def block_ip(self, datapath, ip_src):
 		ofproto = datapath.ofproto
 		parser = datapath.ofproto_parser
-		timestamp = datetime.time()
+		timestamp = datetime.now()
 		match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=ip_src)
 		actions = []
-		self.add_flow(datapath, timestamp, 100, match, actions, hardtime=120) ## Hardtime is really important for blocking range 
-  ## TODO hardtime as a parameter
-  
+		self.add_flow(datapath, timestamp, 1, match, actions, hard_time=BAN_TIMEOUT) ## Hardtime is really important for blocking range 
+	## TODO hardtime as a parameter
+	
 	def drop_flow(self, datapath, cookie_num):
 		ofproto = datapath.ofproto
 		parser = datapath.ofproto_parser
@@ -140,12 +142,19 @@ class SimpleSwitch13(app_manager.RyuApp):
 			cookie=cookie_num, ## cookie will help to match the flows
 			cookie_mask=0xFFFFFFFFFFFFFFFF,
 			table_id=ofproto.OFPTT_ALL,
+			hard_timeout=BAN_TIMEOUT,
+			idle_timeout=BAN_TIMEOUT,
 			command=ofproto.OFPFC_DELETE,
 			out_port=ofproto.OFPP_ANY,
 			out_group=ofproto.OFPG_ANY)
 		## TODO add match to the flow
 		datapath.send_msg(mod)
-
+	
+	def add_banned_list(self,flow):
+		self.banned_list.append(flow)
+  
+	def add_white_list(self, flow):
+		self.white_list.append(flow)
 	# When packet_in async messages comes from switch to the controller, it will trigger this function
 	@set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
 	def _packet_in_handler(self, ev):
@@ -185,7 +194,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 		dst = eth.dst
 		src = eth.src
 		dpid = format(datapath.id, "d").zfill(16)
-  
+	
 		self.mac_to_port.setdefault(dpid, {})
 		self.mac_to_port[dpid][src] = in_port
 
@@ -244,7 +253,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 		idle_timeout = msg.idle_timeout
 		packet_count = msg.packet_count
 		byte_count = msg.byte_count
-		self.write_to_csv()
+		# self.write_to_csv()
 		if msg.reason == ofp.OFPRR_IDLE_TIMEOUT:
 			reason = 'IDLE TIMEOUT'
 		elif msg.reason == ofp.OFPRR_HARD_TIMEOUT:
