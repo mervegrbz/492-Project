@@ -2,17 +2,17 @@
 
 import numpy as np
 import pandas as pd
+from parameters import HIGH_RATE_THRESHOLD
 
-HIGH_RATE_THRESHOLD = 20 ## it is a threshold value for detecting high rate attack
 HIGH_RATE_FLAG = False
 LOW_RATE_FLAG = False
 
 def get_occupancy_rate(data):
+    global HIGH_RATE_FLAG, LOW_RATE_FLAG
     ## data is a type of pd.DataFrame 
     ## check the occupancy rate if it is higher than 0.8 then general attack can be occured
     capacity_derivatives = data['capacity_used'].diff()
     capacity_last_row = data['capacity_used'].iloc[-1]
-    
     if (capacity_last_row > 0.8):
         print("General Attack Detected")
         return True
@@ -22,13 +22,14 @@ def get_occupancy_rate(data):
     ## if it is higher than the mean then it can be a high rate attack
     mean_capacity_derivatives = capacity_derivatives.mean()
     last_capacity_derivative = capacity_derivatives.iloc[-1]
-    if (last_capacity_derivative > mean_capacity_derivatives):
+    if (last_capacity_derivative > mean_capacity_derivatives * 1.2):
         print("High Rate Attack Detected")
         HIGH_RATE_FLAG = True
         
         return True
     
 def get_packet_in_rate(data):
+    global HIGH_RATE_FLAG, LOW_RATE_FLAG
     ## check the packet in rate if it is higher than 20 then it can be a high rate attack
     packet_in_rate = data['packet_in_rate'].diff()
     packet_in_rate_last_row = data['packet_in_rate'].iloc[-1]
@@ -50,11 +51,8 @@ def get_entropy(data):
     entropy = -np.sum(probabilities * np.log2(probabilities))
     return entropy
 
-def get_flow_table_stats(data):
-    columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet',
-               'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev', 
-               'flow_table_stats', 'removed_table_stats' ]
-
+def check_flow_durations(data):
+    global HIGH_RATE_FLAG, LOW_RATE_FLAG
     average_flow_duration_on_table = None
     if (len(data)> 5):
         average_flow_duration_on_table = data['average_flow_duration_on_table'].iloc[-5:]
@@ -67,6 +65,18 @@ def get_flow_table_stats(data):
         print("Low Rate Attack Detected")
         LOW_RATE_FLAG = True
         return True
+    
+
+def get_flow_table_stats(data):
+    if(len(data) < 5 ):
+        print('There is no enough data')
+        pass
+
+    get_packet_in_rate(data)
+    get_occupancy_rate(data)
+    check_flow_durations(data)
+    
+    
 
 
 
