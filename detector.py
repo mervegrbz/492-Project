@@ -50,10 +50,12 @@ def get_packet_in_rate(data):
         return True
 
 def get_entropy(data):
-    unique, counts = np.unique(data, return_counts=True)
-    probabilities = counts / len(data)
-    entropy = -np.sum(probabilities * np.log2(probabilities))
-    return entropy
+    # calc entropy using scipy
+    from scipy.stats import entropy
+    data = data.dropna()
+    histogram, _ = np.histogram(data, bins=100)
+    return entropy(histogram)
+
 
 def check_flow_durations(data):
     global HIGH_RATE_FLAG, LOW_RATE_FLAG
