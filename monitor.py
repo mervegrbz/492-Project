@@ -53,11 +53,12 @@ class SimpleMonitor13(switch.SimpleSwitch13):
     def _flow_stats_reply_handler(self, ev):
         timestamp = timestamp.timestamp()
         body = ev.msg.body
+        datapath = ev.msg.datapath
         icmp_code = -1
         icmp_type = -1
         tp_src = 0
         tp_dst = 0
-
+        flow_list = []
         for stat in sorted([flow for flow in body if (flow.priority == 1) ], key=lambda flow:
             (flow.match['eth_type'],flow.match['ipv4_src'],flow.match['ipv4_dst'],flow.match['ip_proto'])):
         
@@ -76,9 +77,26 @@ class SimpleMonitor13(switch.SimpleSwitch13):
             flow_id = str(ip_src) + str(tp_src) + str(ip_dst) + str(tp_dst) + str(ip_proto)
             packet_count_per_second = stat.packet_count/stat.duration_sec if stat.duration_sec != 0 else 0
             byte_count_per_second = stat.byte_count/stat.duration_sec if stat.duration_sec != 0 else 0
+            flow_list.append([ip_src,packet_count_per_second,byte_count_per_second, flow.cookie])
         
         switch = self.switch_list[ev.msg.datapath.id]
-        last_batch = switch.history_batches[-1]
+        # switch has the history batches of flow statistics get the related columns and compare it with current flow to understand whether it is suspected or not
+        related_batch = switch.get_related_batch(num_of_batch=5)
+        columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet',
+             'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev', 'number_of_errors'
+             'flow_table_stats', 'removed_table_stats']
+        removed_flow_average_duration = related_batch['removed_flow_average_duration'].mean()
+        removed_flow_byte_per_packet = related_batch['removed_flow_byte_per_packet'].mean()
+        
+        for flow in flow_list:
+            if flow[1] < 0.8 * removed_flow_byte_per_packet and flow[2] > 0.8 * removed_flow_average_duration:
+                switch.add_suspected_flow(flow)
+                switch.drop_flow(datapath, flow[3])
+                switch.block_ip(datapath, flow[0] )
+
+            if flow[1] > 2 * removed_flow_byte_per_packet: 
+                ## TODO protect the whitelisted flows from being banned
+                switch.add_white_flow(flow)
         ## removed_flow_average_duration,removed_flow_byte_per_packet,average_flow_duration_on_table can be used to detect whether the flow is suspected or not
         
         
