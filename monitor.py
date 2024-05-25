@@ -59,26 +59,27 @@ class SimpleMonitor13(switch.SimpleSwitch13):
 				tp_src = 0
 				tp_dst = 0
 				flow_list = []
-				for stat in sorted([flow for flow in body if (flow.priority == 1) ], key=lambda flow:
-						(flow.match['eth_type'],flow.match['ipv4_src'],flow.match['ipv4_dst'],flow.match['ip_proto'])):
+				for stat in body:
+					switch.format_match(stat.match)
+					ip_src = stat.match['ipv4_src']
+					ip_dst = stat.match['ipv4_dst']
+					ip_proto = stat.match['ip_proto'] 
+					if stat.match['ip_proto'] == 1:
+							icmp_code = stat.match['icmpv4_code']
+							icmp_type = stat.match['icmpv4_type'] 
+					elif stat.match['ip_proto'] == 6:
+							tp_src = stat.match['tcp_src']
+							tp_dst = stat.match['tcp_dst']
+					elif stat.match['ip_proto'] == 17:
+							tp_src = stat.match['udp_src']
+							tp_dst = stat.match['udp_dst']
+					
 				
-						ip_src = stat.match['ipv4_src']
-						ip_dst = stat.match['ipv4_dst']
-						ip_proto = stat.match['ip_proto'] 
-						if stat.match['ip_proto'] == 1:
-								icmp_code = stat.match['icmpv4_code']
-								icmp_type = stat.match['icmpv4_type'] 
-						elif stat.match['ip_proto'] == 6:
-								tp_src = stat.match['tcp_src']
-								tp_dst = stat.match['tcp_dst']
-						elif stat.match['ip_proto'] == 17:
-								tp_src = stat.match['udp_src']
-								tp_dst = stat.match['udp_dst']
-						flow_id = str(ip_src) + str(tp_src) + str(ip_dst) + str(tp_dst) + str(ip_proto)
-						packet_count_per_second = stat.packet_count/stat.duration_sec if stat.duration_sec != 0 else 0
-						byte_count_per_second = stat.byte_count/stat.duration_sec if stat.duration_sec != 0 else 0
-						flow_list.append([ip_src,packet_count_per_second,byte_count_per_second, stat.cookie])
-				
+
+					packet_count_per_second = stat.packet_count/stat.duration_sec if stat.duration_sec != 0 else 0
+					byte_count_per_second = stat.byte_count/stat.duration_sec if stat.duration_sec != 0 else 0
+					flow_list.append([ip_src,packet_count_per_second,byte_count_per_second, stat.cookie])
+			
 				switch = self.switch_list[ev.msg.datapath.id]
 				# switch has the history batches of flow statistics get the related columns and compare it with current flow to understand whether it is suspected or not
 				related_batch = switch.get_related_batch(num_of_batch=5)

@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 from parameters import HIGH_RATE_THRESHOLD
+from scipy.stats import zscore
 
 HIGH_RATE_FLAG = False
 LOW_RATE_FLAG = False
@@ -50,7 +51,6 @@ def get_packet_in_rate(data):
         return True
 
 def get_entropy(data):
-    # calc entropy using scipy
     from scipy.stats import entropy
     data = data.dropna()
     histogram, _ = np.histogram(data, bins=100)
@@ -71,9 +71,38 @@ def check_flow_durations(data):
         print("Low Rate Attack Detected because of flow durations")
         LOW_RATE_FLAG = True
         return True
-    
 
-def get_flow_table_stats(data):
+def get_flow_entropy(flow_table):
+    pass
+
+def create_groups(df):
+    # Create the necessary groupings
+    df['ip_proto'] = df['ip_proto'].astype(str)
+    df['ipv4_src-ipv4_dst'] = df['ipv4_src'] + '-' + df['ipv4_dst']
+    df['ipv4_src-ip_proto'] = df['ipv4_src'] + '-' + df['ip_proto']
+    groupings = ['ipv4_src', 'ipv4_dst', 'ipv4_src-ipv4_dst', 'ipv4_src-ip_proto']
+    aggregated_data = {}
+
+    for group in groupings:
+        aggregated_data[group] = df.groupby(group).agg({
+            'type': 'count',
+        }).reset_index()
+    return aggregated_data
+
+## this statistics calculates the z score of the flows in terms of ['ipv4_src', 'ipv4_dst', 'ipv4_src-ipv4_dst', 'ipv4_src-ip_proto']
+## if z score is exceeded then the flow is marked as malicious
+
+def get_flow_rule_statistics(flow_table):
+    data = create_groups(flow_table)
+    
+    for key in data.keys():
+        print(data[key])
+        data[key]['z_score'] = zscore(data[key]['type'])
+        # Mark IPs with Z-Score above a certain threshold as suspicious
+        threshold = 3  # Common choice for identifying outliers
+        data[key]['is_malicious'] = data[key]['z_score'].abs() > threshold
+        
+def detect_attack(data):
     if(len(data) < 5 ):
         print('There is no enough data')
         pass

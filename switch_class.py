@@ -6,7 +6,7 @@ import pandas as pd
 import data_classes as data_model
 from detection import *
 import statistics
-from detector import get_flow_table_stats
+from detector import detect_attack
 from parameters import TABLE_CAPACITY, UPPER_THRESHOLD_STD_DEV, MEAN_THRESHOLD, LOWER_THRESHOLD_STD_DEV, CAPACITY_THRESHOLD, HIGH_RATE_FLAG, LOW_RATE_FLAG, IDLE_TIMEOUT
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -52,8 +52,6 @@ class Switch:
 
 	def __init__(self, connection_time, datapath_id, n_buffers, n_tables, capabilities, datapath, switch_app):
 		self.connection_time = connection_time
-		self.switch_app = switch_app # for calling its function
-		self.datapath = datapath # for calling send request
 		self.datapath_id = datapath_id
 		self.n_buffers = n_buffers
 		self.n_tables = n_tables
@@ -64,7 +62,8 @@ class Switch:
              'removed_flow_average_duration', 'removed_flow_byte_per_packet',
              'average_flow_duration_on_table', 'packet_in_rate', 'number_of_errors',
              'flow_table_stats', 'removed_table_stats']
-		self.history_batches = pd.DataFrame(columns=columns)
+		self.history_batches = pd.DataFrame(columns=columns)  
+		self.flow_rules = pd.DataFrame(columns=['ipv4_src','ipv4_dst','port_src','port_dst','ip_proto', 'actions', 'cookie', 'duration_sec', 'byte_count', 'packet_count', 'idle_timeout', 'timestamp'])
 		self.scheduler = BackgroundScheduler()
 		self.scheduler.add_job(self.flow_table_stats, 'interval', seconds=5)
 		self.scheduler.start()
@@ -108,15 +107,38 @@ class Switch:
 		if operation == FLOW_OPERATION.ADD:
 				if(len(self.flow_table)>=self.capacity):
 					return
-				self.flow_table.append(current_flow)
+				self.flow_table.append(current_flow, operation)
+				self.append_flow_rules(current_flow)
 				self.flow_mods += 1
 		elif operation == FLOW_OPERATION.DELETE:
 				for flow in self.flow_table:
 						if flow['cookie'] == current_flow['cookie']:
+								self.append_flow_rules(flow, operation)
 								self.flow_table.remove(flow)
 								self.flow_removed.append(current_flow)
 								self.n_flow_removed += 1
 
+
+	def append_flow_rules(self, flow, operation):
+		_flow = {}
+		## switch supports only three protocols for now	
+		if(operation == FLOW_OPERATION.DELETE):
+			## find the flow rule in the flow_rules and insert the duration_sec, byte_count, packet_count
+			for index, row in self.flow_rules.iterrows():
+				if(flow['cookie']== row['cookie']):
+					self.flow_rules.at[index, 'duration_sec'] = flow['duration_sec']
+					self.flow_rules.at[index, 'byte_count'] = flow['byte_count']
+					self.flow_rules.at[index, 'packet_count'] = flow['packet_count']
+					break
+		if (operation == FLOW_OPERATION.ADD):
+			if (flow['ip_proto'] == 6):
+				_flow = {'ipv4_src': flow['ipv4_src'], 'ipv4_dst': flow['ipv4_dst'], 'port_src': flow['tcp_src'], 'port_dst': flow['tcp_dst'], 'ip_proto': flow['ip_proto'], 'actions': flow['actions'], 'cookie': flow['cookie'], 'idle_timeout': flow['idle_timeout'], 'timestamp': time.time()}
+			if (flow['ip_proto'] == 17):
+				_flow = {'ipv4_src': flow['ipv4_src'], 'ipv4_dst': flow['ipv4_dst'], 'port_src': flow['udp_src'], 'port_dst': flow['udp_dst'], 'ip_proto': flow['ip_proto'], 'actions': flow['actions'], 'cookie': flow['cookie'], 'idle_timeout': flow['idle_timeout'], 'timestamp': time.time()}
+			if (flow['ip_proto'] == 1):
+				_flow = {'ipv4_src': flow['ipv4_src'], 'ipv4_dst': flow['ipv4_dst'], 'port_src': flow['icmpv4_type'], 'port_dst': flow['icmpv4_code'], 'ip_proto': flow['ip_proto'], 'actions': flow['actions'], 'cookie': flow['cookie'], 'idle_timeout': flow['idle_timeout'], 'timestamp': time.time()}
+			self.flow_rules.loc[len(self.flow_rules)] = _flow
+		
 	# this function calculates average duration of flows in the flow table
 	def inspect_flow_table(self):
 		total_duration = 0
@@ -168,7 +190,9 @@ class Switch:
 																		'removed_flow_byte_per_packet': flow_average_byte_per_packet, 'average_flow_duration_on_table': average_flow_duration_on_table,
 																		'packet_in_rate': self.n_packet_in, 'number_of_errors': self.n_errors ,'flow_table_stats': flow_table_stats, 'removed_table_stats': removed_table_stats }
 			##TODO call the flow_mod_statistics method
-			get_flow_table_stats(self.history_batches)
+			detect_attack(self.history_batches)
+			
+
 			if(len(self.history_batches) > 30 ) :
 				self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
 
