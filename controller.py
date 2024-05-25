@@ -132,7 +132,6 @@ class SimpleSwitch13(app_manager.RyuApp):
 		match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=ip_src)
 		actions = []
 		self.add_flow(datapath, timestamp, 2, match, actions, hard_time=BAN_TIMEOUT) ## Hardtime is really important for blocking range 
-	## TODO hardtime as a parameter
 	
 	def drop_flow(self, datapath, cookie_num):
 		ofproto = datapath.ofproto
@@ -149,7 +148,6 @@ class SimpleSwitch13(app_manager.RyuApp):
 			out_port=ofproto.OFPP_ANY,
 			out_group=ofproto.OFPG_ANY)
 		## TODO add match to the flow
-		# TODO match olmadan nasıl dropluyor doğru flowu?, datapathten mi alıyor, eğer öyleyse niye match'e ihtiyaç var ?
 		datapath.send_msg(mod)
 	
 	def add_banned_list(self,flow):
@@ -270,10 +268,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 		# add this message into csv, increase n_removed_flows, update the flow table and add flow_removed to this flow
 		flow_removed_details = {'type': 'FLOWREMOVED', 'timestamp': timestamp, 'datapath_id': datapath_id, 'match': format_match(match), 'cookie': cookie, 'priority': priority,'duration_sec': duration_sec, 'duration_nsec': duration_nsec, 'idle_timeout': idle_timeout, 'packet_count': packet_count, 'byte_count': byte_count, 'reason': reason}
 		flow_list.append(flow_removed_details)
-		switch = self.switch_list[datapath_id]	
-		removed_flow = datamodel.FlowRemoved(datapath_id=datapath_id, timestamp=timestamp, match=match, idle_timeout=idle_timeout, 
-										 duration_sec=duration_sec,duration_nsec=duration_nsec, packet_count=packet_count,
-										 byte_count=byte_count, reason= reason, cookie=cookie, priority=priority)			   
+		switch = self.switch_list[datapath_id]	   
 		switch.update_flow_table(flow_removed_details, switch_class.FLOW_OPERATION.DELETE)
 
 	# This function will trigger whenever an error messages comes into the controller
