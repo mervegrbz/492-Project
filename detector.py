@@ -2,7 +2,7 @@
 
 import numpy as np
 import pandas as pd
-from parameters import HIGH_RATE_THRESHOLD
+from parameters import *
 from scipy.stats import zscore
 
 HIGH_RATE_FLAG = False
@@ -12,15 +12,17 @@ def get_occupancy_rate(data):
     global HIGH_RATE_FLAG, LOW_RATE_FLAG
     ## data is a type of pd.DataFrame 
     ## check the occupancy rate if it is higher than 0.8 then general attack can be occured
-    capacity_derivatives = data['capacity_used'].diff(periods=1)
+    capacity_derivatives = data['capacity_used'][-5:].diff(periods=1)
     capacity_last_row = data['capacity_used'].iloc[-1]
-    if (capacity_last_row > 0.8):
+    ## TODO removed flowlarin sayisi can we used it for detection
+    if (capacity_last_row > CAPACITY_THRESHOLD):
         print("General Attack Detected")
         return True
     ## check the occupancy derivatives trend if the trend is increased immediately then it can be a high rate attack
     ## if the trend is increased gradually then it can be a low rate attack
     ##  get the mean of the  derivatives and check the last derivative is higher than the mean
     ## if it is higher than the mean then it can be a high rate attack
+    ## TODO we can add other means as well but in smaller weights
     mean_capacity_derivatives = capacity_derivatives.mean()
     last_capacity_derivative = capacity_derivatives.iloc[-1]
     
@@ -34,15 +36,17 @@ def get_occupancy_rate(data):
 def get_packet_in_rate(data):
     global HIGH_RATE_FLAG, LOW_RATE_FLAG
     ## check the packet in rate if it is higher than 20 then it can be a high rate attack
-    packet_in_rate = data['packet_in_rate'].diff()
+    packet_in_rate = data['packet_in_rate'][-5:].diff()
     packet_in_rate_last_row = packet_in_rate.iloc[-1]
     if ( packet_in_rate_last_row > abs(packet_in_rate.mean() * HIGH_RATE_THRESHOLD)):
         print("High Rate Attack Detected")
+        # TODO bu nasil negatif cikiyor ya
         print(packet_in_rate)
         HIGH_RATE_FLAG = True
         return True
     ## low rate attacks generally have low differences between the packet in rates if the packet in change rate is too regular then it can be a low rate attack
     ## check the entropy of the packet in rate
+    ## TODO add this to the occupency rate not packet in
     entropy = get_entropy(packet_in_rate)
     print(entropy)
     if (entropy < 0.1):
@@ -59,15 +63,12 @@ def get_entropy(data):
 
 def check_flow_durations(data):
     global HIGH_RATE_FLAG, LOW_RATE_FLAG
-    average_flow_duration_on_table = None
-    if (len(data)> 5):
-        average_flow_duration_on_table = data['average_flow_duration_on_table'].iloc[-5:]
-    else:
-        average_flow_duration_on_table = data['average_flow_duration_on_table']
+    
     mean_removed = data['removed_flow_average_duration'].mean()
-    average_flow_duration_on_table_last_row = average_flow_duration_on_table.iloc[-1]
+    average_flow_duration_on_table_last_row = data['average_flow_duration_on_table'].iloc[-1]
     ## if the average flow duration is bigger then idle timeout and mean removed is bigger than then the now average flow duration then it can be a low rate attack
-    if (average_flow_duration_on_table_last_row > 10 and  mean_removed - average_flow_duration_on_table_last_row > 5):
+    ## average_flow_duration_on_table_last_row > IDLE_TIMEOUT and 
+    if (average_flow_duration_on_table_last_row - mean_removed  > DURATION_THRESHOLD):
         print("Low Rate Attack Detected because of flow durations")
         LOW_RATE_FLAG = True
         return True
@@ -103,11 +104,13 @@ def get_flow_rule_statistics(flow_table):
         data[key]['is_malicious'] = data[key]['z_score'].abs() > threshold
         
 def detect_attack(data):
+    ##TODO check the occupancy rate if it is higher than 0.8 then general attack can be occured
     if(len(data) < 5 ):
         print('There is no enough data')
         pass
-
+    
     get_packet_in_rate(data)
+    ##TODO Bu ikisini andlemek mantikli olabilir LOW_RATE
     get_occupancy_rate(data)
     check_flow_durations(data)
     

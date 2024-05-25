@@ -3,12 +3,12 @@ from ryu.controller.handler import MAIN_DISPATCHER, DEAD_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.lib import hub
 import detector
-import switch
+import controller
 from datetime import datetime
 import pickle,os
 import pandas as pd
 
-class SimpleMonitor13(switch.SimpleSwitch13):
+class SimpleMonitor13(controller.SimpleSwitch13):
 
 		def __init__(self, *args, **kwargs):
 
@@ -28,6 +28,8 @@ class SimpleMonitor13(switch.SimpleSwitch13):
 						if datapath.id in self.datapaths:
 								self.logger.debug('unregister datapath: %016x', datapath.id)
 								del self.datapaths[datapath.id]
+## TODO remove flowlar uzerinden ML calistirip kac tane flowun suspected oldugunu bulup sonrasinda stat cekmek daha mantikli olabilir
+## Eger remove flowlarda suspected var ise stat cekmek mantikli olabilir
 
 		def _monitor(self):
 			while True:
@@ -90,6 +92,7 @@ class SimpleMonitor13(switch.SimpleSwitch13):
 				removed_flow_byte_per_packet = related_batch['removed_flow_byte_per_packet'].mean()
 				
 				for flow in flow_list:
+      ## TODO eger capacity cok yuksek degilse mitigation icin 3 stat daha beklenir burada capacity kontrol bir daha yapalim stat atmadan once eger azsa biraz bekleyelim
 						if flow[1] < 0.8 * removed_flow_byte_per_packet and flow[2] > 0.8 * removed_flow_average_duration:
 								self.add_banned_list(flow)
 								self.drop_flow(datapath, flow[3])
