@@ -49,6 +49,7 @@ class SimpleMonitor13(switch.SimpleSwitch13):
 				req = parser.OFPFlowStatsRequest(datapath)
 				datapath.send_msg(req)
 
+		# TODO ne zaman giriyor buraya
 		@set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
 		def _flow_stats_reply_handler(self, ev):
 				timestamp = datetime.now()
@@ -89,6 +90,7 @@ class SimpleMonitor13(switch.SimpleSwitch13):
 				removed_flow_byte_per_packet = related_batch['removed_flow_byte_per_packet'].mean()
 				
 				for flow in flow_list:
+						# TODO avg durationdan küçükse niye banlıyoz?
 						if flow[1] < 0.8 * removed_flow_byte_per_packet and flow[2] > 0.8 * removed_flow_average_duration:
 								self.add_banned_list(flow)
 								self.drop_flow(datapath, flow[3])

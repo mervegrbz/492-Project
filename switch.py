@@ -149,6 +149,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 			out_port=ofproto.OFPP_ANY,
 			out_group=ofproto.OFPG_ANY)
 		## TODO add match to the flow
+		# TODO match olmadan nasıl dropluyor doğru flowu?, datapathten mi alıyor, eğer öyleyse niye match'e ihtiyaç var ?
 		datapath.send_msg(mod)
 	
 	def add_banned_list(self,flow):

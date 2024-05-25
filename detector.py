@@ -23,6 +23,7 @@ def get_occupancy_rate(data):
     mean_capacity_derivatives = capacity_derivatives.mean()
     last_capacity_derivative = capacity_derivatives.iloc[-1]
     
+    # TODO 1.2 neye göre? az bence stdev'i vs'sine de bakılmalıydı high rate'te baya banlıyoz çünkü
     if (last_capacity_derivative > (mean_capacity_derivatives * 1.2) and mean_capacity_derivatives > 0 ):
         print("High Rate Attack Detected")
         print(mean_capacity_derivatives, capacity_derivatives)
@@ -42,6 +43,7 @@ def get_packet_in_rate(data):
         return True
     ## low rate attacks generally have low differences between the packet in rates if the packet in change rate is too regular then it can be a low rate attack
     ## check the entropy of the packet in rate
+    ## TODO neden capacity'sinin artışına bakmadık da packet in'e baktık?
     entropy = get_entropy(packet_in_rate)
     print(entropy)
     if (entropy < 0.1):
@@ -67,6 +69,7 @@ def check_flow_durations(data):
     mean_removed = data['removed_flow_average_duration'].mean()
     average_flow_duration_on_table_last_row = average_flow_duration_on_table.iloc[-1]
     ## if the average flow duration is bigger then idle timeout and mean removed is bigger than then the now average flow duration then it can be a low rate attack
+    # TODO removeların avg duration'ının şu ankinden fazla olması nasıl low rate'i kanıtlıyor?
     if (average_flow_duration_on_table_last_row > 10 and  mean_removed - average_flow_duration_on_table_last_row > 5):
         print("Low Rate Attack Detected because of flow durations")
         LOW_RATE_FLAG = True
@@ -74,6 +77,7 @@ def check_flow_durations(data):
     
 
 def get_flow_table_stats(data):
+    # TODO aslında burada 5 batch var mı diye bakıyor, sonraki kontroller niye var o zaman, ama ilk high rate saldırıyla başlasa nolur
     if(len(data) < 5 ):
         print('There is no enough data')
         pass

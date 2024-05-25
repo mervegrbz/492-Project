@@ -79,6 +79,7 @@ class Switch:
 			self.overload_timestamps.append(overload_time)
 			# print("Switch %s is overloaded" % self.datapath_id)
 		print(len(self.flow_table))
+		# TODO data classtan çıkar
 		current_occupancy_rate = data_model.OccupancyRate(used_capacity / self.capacity,time.time())
 		self.occupancy_rates.append(current_occupancy_rate)
 		return used_capacity / self.capacity
@@ -112,7 +113,7 @@ class Switch:
 				self.flow_mods += 1
 		elif operation == FLOW_OPERATION.DELETE:
 				for flow in self.flow_table:
-						if flow['cookie'] == current_flow['cookie']:
+						if flow['cookie'] == current_flow['cookie']: #TODO cookieden emin miyiz neden match'e bakmadık?
 								self.flow_table.remove(flow)
 								self.flow_removed.append(current_flow)
 								self.n_flow_removed += 1
@@ -172,7 +173,7 @@ class Switch:
 			if(len(self.history_batches) > 30 ) :
 				self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
 
-		
+	
 	def get_related_batch(self, num_of_batch=5):
 		return self.history_batches[-num_of_batch:] if len(self.history_batches)>num_of_batch else self.history_batches
    
@@ -203,7 +204,7 @@ class Switch:
 		if len(self.occupancy_rates) < 4:
 			return False  # Not enough data to compare
 		
-		# Calculate the differences between consecutive occupancy rates
+		# Calculate the differences between consecutive occupewqancy rates
 		differences = []
 		# do that for previous 4 occupancy rates
 		for i in range(len(self.occupancy_rates) - 5, len(self.occupancy_rates) - 1):
