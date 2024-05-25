@@ -78,6 +78,7 @@ class Switch:
 			self.overload_timestamps.append(overload_time)
 			# print("Switch %s is overloaded" % self.datapath_id)
 		print(len(self.flow_table))
+		# TODO data classtan çıkar
 		current_occupancy_rate = data_model.OccupancyRate(used_capacity / self.capacity,time.time())
 		self.occupancy_rates.append(current_occupancy_rate)
 		return used_capacity / self.capacity
@@ -112,6 +113,7 @@ class Switch:
 				self.flow_mods += 1
 		elif operation == FLOW_OPERATION.DELETE:
 				for flow in self.flow_table:
+						#TODO cookieden emin miyiz neden match'e bakmadık?
 						if flow['cookie'] == current_flow['cookie']:
 								self.append_flow_rules(current_flow, operation)
 								self.flow_table.remove(flow)
