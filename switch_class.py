@@ -107,13 +107,13 @@ class Switch:
 		if operation == FLOW_OPERATION.ADD:
 				if(len(self.flow_table)>=self.capacity):
 					return
-				self.flow_table.append(current_flow, operation)
-				self.append_flow_rules(current_flow)
+				self.flow_table.append(current_flow)
+				self.append_flow_rules(current_flow, operation)
 				self.flow_mods += 1
 		elif operation == FLOW_OPERATION.DELETE:
 				for flow in self.flow_table:
 						if flow['cookie'] == current_flow['cookie']:
-								self.append_flow_rules(flow, operation)
+								self.append_flow_rules(current_flow, operation)
 								self.flow_table.remove(flow)
 								self.flow_removed.append(current_flow)
 								self.n_flow_removed += 1
@@ -123,21 +123,21 @@ class Switch:
 		_flow = {}
 		## switch supports only three protocols for now	
 		if(operation == FLOW_OPERATION.DELETE):
+			row_index = self.flow_rules.loc[self.flow_rules['cookie'] == flow['cookie']].index[0]
+
 			## find the flow rule in the flow_rules and insert the duration_sec, byte_count, packet_count
-			for index, row in self.flow_rules.iterrows():
-				if(flow['cookie']== row['cookie']):
-					self.flow_rules.at[index, 'duration_sec'] = flow['duration_sec']
-					self.flow_rules.at[index, 'byte_count'] = flow['byte_count']
-					self.flow_rules.at[index, 'packet_count'] = flow['packet_count']
-					break
+			self.flow_rules.loc[row_index, 'duration_sec'] = flow['duration_sec']
+			self.flow_rules.loc[row_index, 'byte_count'] = flow['byte_count']
+			self.flow_rules.loc[row_index, 'packet_count'] = flow['packet_count']
 		if (operation == FLOW_OPERATION.ADD):
-			if (flow['ip_proto'] == 6):
-				_flow = {'ipv4_src': flow['ipv4_src'], 'ipv4_dst': flow['ipv4_dst'], 'port_src': flow['tcp_src'], 'port_dst': flow['tcp_dst'], 'ip_proto': flow['ip_proto'], 'actions': flow['actions'], 'cookie': flow['cookie'], 'idle_timeout': flow['idle_timeout'], 'timestamp': time.time()}
-			if (flow['ip_proto'] == 17):
-				_flow = {'ipv4_src': flow['ipv4_src'], 'ipv4_dst': flow['ipv4_dst'], 'port_src': flow['udp_src'], 'port_dst': flow['udp_dst'], 'ip_proto': flow['ip_proto'], 'actions': flow['actions'], 'cookie': flow['cookie'], 'idle_timeout': flow['idle_timeout'], 'timestamp': time.time()}
-			if (flow['ip_proto'] == 1):
-				_flow = {'ipv4_src': flow['ipv4_src'], 'ipv4_dst': flow['ipv4_dst'], 'port_src': flow['icmpv4_type'], 'port_dst': flow['icmpv4_code'], 'ip_proto': flow['ip_proto'], 'actions': flow['actions'], 'cookie': flow['cookie'], 'idle_timeout': flow['idle_timeout'], 'timestamp': time.time()}
-			self.flow_rules.loc[len(self.flow_rules)] = _flow
+			if (flow['match']['ip_proto'] == 6):
+				_flow = {'ipv4_src': flow['match']['ipv4_src'], 'ipv4_dst': flow['match']['ipv4_dst'], 'port_src': flow['match']['tcp_src'], 'port_dst': flow['match']['tcp_dst'], 'ip_proto': flow['match']['ip_proto'], 'cookie': flow['cookie'], 'idle_timeout': flow['idle_timeout'], 'timestamp': time.time(), 'duration_sec': 0, 'byte_count': 0, 'packet_count': 0}
+			if (flow['match']['ip_proto'] == 17):
+				_flow = {'ipv4_src': flow['match']['ipv4_src'], 'ipv4_dst': flow['match']['ipv4_dst'], 'port_src': flow['match']['udp_src'], 'port_dst': flow['match']['udp_dst'], 'ip_proto': flow['match']['ip_proto'], 'cookie': flow['cookie'], 'idle_timeout': flow['idle_timeout'], 'timestamp': time.time(),'duration_sec': 0, 'byte_count': 0, 'packet_count': 0}
+			if (flow['match']['ip_proto'] == 1):
+				_flow = {'ipv4_src': flow['match']['ipv4_src'], 'ipv4_dst': flow['match']['ipv4_dst'], 'port_src': flow['match']['icmpv4_type'], 'port_dst': flow['match']['icmpv4_code'], 'ip_proto': flow['match']['ip_proto'], 'cookie': flow['cookie'], 'idle_timeout': flow['idle_timeout'], 'timestamp': time.time(),'duration_sec': 0, 'byte_count': 0, 'packet_count': 0}
+			if (_flow !={}):
+				self.flow_rules.loc[len(self.flow_rules)] = _flow
 		
 	# this function calculates average duration of flows in the flow table
 	def inspect_flow_table(self):

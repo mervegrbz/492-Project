@@ -62,22 +62,21 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 				tp_dst = 0
 				flow_list = []
 				for stat in body:
-					switch.format_match(stat.match)
-					ip_src = stat.match['ipv4_src']
-					ip_dst = stat.match['ipv4_dst']
-					ip_proto = stat.match['ip_proto'] 
+					match = controller.format_match(stat.match)
+					if ( match == {} or 'ip_proto' not in  match ):
+			 				continue
+					ip_src = match['ipv4_src']
+					ip_dst = match['ipv4_dst']
+					ip_proto = match['ip_proto'] 
 					if stat.match['ip_proto'] == 1:
-							icmp_code = stat.match['icmpv4_code']
-							icmp_type = stat.match['icmpv4_type'] 
+							icmp_code =match['icmpv4_code']
+							icmp_type = match['icmpv4_type'] 
 					elif stat.match['ip_proto'] == 6:
-							tp_src = stat.match['tcp_src']
-							tp_dst = stat.match['tcp_dst']
+							tp_src = match['tcp_src']
+							tp_dst = match['tcp_dst']
 					elif stat.match['ip_proto'] == 17:
-							tp_src = stat.match['udp_src']
-							tp_dst = stat.match['udp_dst']
-					
-				
-
+							tp_src = match['udp_src']
+							tp_dst = match['udp_dst']
 					packet_count_per_second = stat.packet_count/stat.duration_sec if stat.duration_sec != 0 else 0
 					byte_count_per_second = stat.byte_count/stat.duration_sec if stat.duration_sec != 0 else 0
 					flow_list.append([ip_src,packet_count_per_second,byte_count_per_second, stat.cookie])
@@ -92,7 +91,7 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 				removed_flow_byte_per_packet = related_batch['removed_flow_byte_per_packet'].mean()
 				
 				for flow in flow_list:
-      ## TODO eger capacity cok yuksek degilse mitigation icin 3 stat daha beklenir burada capacity kontrol bir daha yapalim stat atmadan once eger azsa biraz bekleyelim
+			## TODO eger capacity cok yuksek degilse mitigation icin 3 stat daha beklenir burada capacity kontrol bir daha yapalim stat atmadan once eger azsa biraz bekleyelim
 						if flow[1] < 0.8 * removed_flow_byte_per_packet and flow[2] > 0.8 * removed_flow_average_duration:
 								self.add_banned_list(flow)
 								self.drop_flow(datapath, flow[3])
