@@ -48,12 +48,12 @@ if __name__ == '__main__':
         topology = arguments[1]
         if topology == 'linear':
             topo = MininetTopo()
-        elif topology == 'tree': #TODO topology should be tree
+        elif topology == 'tree':
             topo = MininetTopo()
         else:
             print('Invalid topology')
             sys.exit(1)
-    elif len(arguments) > 3: #TODO number of switch and host per switch should be entered
+    elif len(arguments) > 3:
         topology = arguments[1]
         number_of_switch = int(arguments[2])
         number_of_host_per_switch = int(arguments[3])

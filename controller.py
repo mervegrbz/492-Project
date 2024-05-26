@@ -147,7 +147,6 @@ class SimpleSwitch13(app_manager.RyuApp):
 			command=ofproto.OFPFC_DELETE,
 			out_port=ofproto.OFPP_ANY,
 			out_group=ofproto.OFPG_ANY)
-		## TODO add match to the flow
 		datapath.send_msg(mod)
 	
 	def add_banned_list(self,flow):
@@ -264,7 +263,6 @@ class SimpleSwitch13(app_manager.RyuApp):
 			reason = 'GROUP DELETE'
 		else:
 			reason = 'unknown'
-		# TODO check occupance rate of switch
 		# add this message into csv, increase n_removed_flows, update the flow table and add flow_removed to this flow
 		flow_removed_details = {'type': 'FLOWREMOVED', 'timestamp': timestamp, 'datapath_id': datapath_id, 'match': format_match(match), 'cookie': cookie, 'priority': priority,'duration_sec': duration_sec, 'duration_nsec': duration_nsec, 'idle_timeout': idle_timeout, 'packet_count': packet_count, 'byte_count': byte_count, 'reason': reason}
 		flow_list.append(flow_removed_details)
@@ -285,7 +283,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 			reason = 'OFPET_BAD_REQUEST'
 		elif msg.type == dp.ofproto.OFPET_BAD_ACTION:
 			reason = 'OFPET_BAD_ACTION'
-		elif msg.type == dp.ofproto.OFPET_FLOW_MOD_FAILED: #TODO add update thresholds function
+		elif msg.type == dp.ofproto.OFPET_FLOW_MOD_FAILED:
 			reason = 'OFPET_FLOW_MOD_FAILED'
 		elif msg.type == dp.ofproto.OFPET_PORT_MOD_FAILED:
 			reason = 'OFPET_PORT_MOD_FAILED'
@@ -296,43 +294,3 @@ class SimpleSwitch13(app_manager.RyuApp):
 		switch = self.switch_list[dp.id]
 		switch.n_errors+=1
 		flow_list.append({'type': 'ERROR', 'timestamp': ev.timestamp, 'datapath_id': dp.id, 'reason': reason, 'eth_src': eth.src, 'eth_dst': eth.dst, "data": error_data, "error_code": error_code})
-
-	# this will send aggregate stats request to the switches (they will response as the sum of their flow tables)
-	def send_aggregate_stats_request(self, datapath):
-		ofp = datapath.ofproto
-		ofp_parser = datapath.ofproto_parser
-
-		cookie = cookie_mask = 0
-		match = ofp_parser.OFPMatch(in_port=1)
-		req = ofp_parser.OFPAggregateStatsRequest(datapath, 0,
-												ofp.OFPTT_ALL,
-												ofp.OFPP_ANY,
-												ofp.OFPG_ANY,
-												cookie, cookie_mask,
-												match)
-		datapath.send_msg(req)
-
-	# when responses comes from switches after sending flow stats request, this function will be triggered
-	# we should use it to whether our flow_count and real flow count is match by calling it in 20 sec i.e.
-	@set_ev_cls(ofp_event.EventOFPAggregateStatsReply, MAIN_DISPATCHER)
-	def aggregate_stats_reply_handler(self, ev):
-		"""{
-		"OFPAggregateStatsReply": {
-			"body": {
-				"OFPAggregateStats": {
-					"byte_count": 574, 
-					"flow_count": 6, 
-					"packet_count": 7
-				}
-			}, 
-			"flags": 0, 
-			"type": 2
-		}
-		}"""
-		body = ev.msg.body
-
-		self.logger.debug('AggregateStats: packet_count=%d byte_count=%d '
-						'flow_count=%d',
-						body.packet_count, body.byte_count,
-						body.flow_count)
-	

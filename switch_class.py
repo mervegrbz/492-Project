@@ -70,8 +70,7 @@ class Switch:
 		return used_capacity / self.capacity
 
 	# this function calculates the statistics from removed flows. 
-	# it calculates and returns flow_average_duration, flow_average_byte_per_packet
-	# TODO I think it need byte per sec instead of byte per packet as we discuss with instructor!, so I add byte per sec
+	# it calculates and returns flow_average_duration, flow_average_byte_per_packet, average_byte_per_sec
 	def calc_removed_flows(self):
 		average_duration = 0
 		average_byte_per_packet = 0	
@@ -103,7 +102,6 @@ class Switch:
 
 		elif operation == FLOW_OPERATION.DELETE:
 			for flow in self.flow_table:
-				#TODO cookieden emin miyiz neden match'e bakmadık?
 				if flow['cookie'] == current_flow['cookie']:
 					self.append_flow_rules(current_flow, operation)
 					self.flow_table.remove(flow)
@@ -174,7 +172,6 @@ class Switch:
 			ip_src = [(i['match']['ipv4_src'],i['timestamp']-now) for i in table if 'ipv4_src' in i['match']]
 			ip_dst = [(i['match']['ipv4_dst'],i['timestamp']-now) for i in table if 'ipv4_dst' in i['match']]
 		
-		## TODO add the average duration for each ip_src and ip_dst
 		count_dict, avg_time_dict = self.count_unique(ip_proto)
 		stats.append(count_dict)
 		avg_times.append(avg_time_dict)
