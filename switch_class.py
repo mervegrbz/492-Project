@@ -6,8 +6,8 @@ import pandas as pd
 import data_classes as data_model
 from detection import *
 import statistics
-from detector import detect_attack
-from parameters import TABLE_CAPACITY, UPPER_THRESHOLD_STD_DEV, MEAN_THRESHOLD, LOWER_THRESHOLD_STD_DEV, CAPACITY_THRESHOLD, HIGH_RATE_FLAG, LOW_RATE_FLAG, IDLE_TIMEOUT
+from predictor import *
+from parameters import *
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
@@ -49,8 +49,8 @@ class Switch:
 		self.capabilities = capabilities
 		self.capacity = TABLE_CAPACITY
 		columns = ['timestamp', 'capacity_used', 
-             'removed_flow_average_duration', 'removed_flow_byte_per_packet',
-             'average_flow_duration_on_table', 'packet_in_rate', 'number_of_errors',
+             'removed_flow_average_duration', 'removed_flow_byte_per_packet', 'removed_average_byte_per_sec',
+             'average_flow_duration_on_table', 'packet_in_rate', 'removed_flows_count', 'number_of_errors',
              'flow_table_stats', 'flow_table_stats_durations' 'removed_table_stats', 'removed_table_stats_durations']
 		self.history_batches = pd.DataFrame(columns=columns)  
 		self.flow_rules = pd.DataFrame(columns=['ipv4_src','ipv4_dst','port_src','port_dst','ip_proto', 'actions', 'cookie', 'duration_sec', 'byte_count', 'packet_count', 'idle_timeout', 'timestamp'])
@@ -71,9 +71,11 @@ class Switch:
 
 	# this function calculates the statistics from removed flows. 
 	# it calculates and returns flow_average_duration, flow_average_byte_per_packet
+	# TODO I think it need byte per sec instead of byte per packet as we discuss with instructor!, so I add byte per sec
 	def calc_removed_flows(self):
 		average_duration = 0
 		average_byte_per_packet = 0	
+		average_byte_per_sec = 0
 		# TODO get the last N elements of the removed flows to monitor change
 		for flow in self.flow_removed:
 			duration_sec = flow['duration_sec']
@@ -83,10 +85,12 @@ class Switch:
 			
 			average_byte_per_packet += byte_count/packet_count  if packet_count > 0 else 0
 			average_duration += duration_sec
+			average_byte_per_sec += byte_count/duration_sec  if duration_sec > 0 else 0
 
 		flow_average_duration = average_duration/len(self.flow_removed) if (len(self.flow_removed)>0) else 0
 		flow_average_byte_per_packet = average_byte_per_packet / len(self.flow_removed) if (len(self.flow_removed)>0) else 0
-		return flow_average_duration, flow_average_byte_per_packet
+		average_byte_per_sec = average_byte_per_sec / len(self.flow_removed) if (len(self.flow_removed)>0) else 0
+		return flow_average_duration, flow_average_byte_per_packet, average_byte_per_sec
 
 	# this function updates the flow table, if the operation is ADD, append the flow into the flowtable,
 	# else if it's delete, delete it from the table by using its match criteria
@@ -96,7 +100,7 @@ class Switch:
 				return
 			self.flow_table.append(current_flow)
 			self.append_flow_rules(current_flow, operation)
-			
+
 		elif operation == FLOW_OPERATION.DELETE:
 			for flow in self.flow_table:
 				#TODO cookieden emin miyiz neden match'e bakmadık?
@@ -186,16 +190,16 @@ class Switch:
 	def flow_table_stats(self):
 		print("flow_table_stats")
 		capacity_used = self.calc_occupance_rate()
-		flow_average_duration, flow_average_byte_per_packet = self.calc_removed_flows()
+		flow_average_duration, flow_average_byte_per_packet, removed_average_byte_per_sec = self.calc_removed_flows()
 		average_flow_duration_on_table = self.average_duration_on_flow_table()
 		flow_table_stats, flow_table_stats_durations = self.flow_mod_statistics(self.flow_table, False)
 		removed_table_stats, removed_table_stats_durations = self.flow_mod_statistics(self.flow_removed, True)
 		print(time.time(), capacity_used, flow_average_duration, flow_average_byte_per_packet, average_flow_duration_on_table)
 		self.history_batches.loc[len(self.history_batches)] = {'timestamp': time.time(), 'capacity_used': capacity_used, 'removed_flow_average_duration': flow_average_duration,
-																	'removed_flow_byte_per_packet': flow_average_byte_per_packet, 'average_flow_duration_on_table': average_flow_duration_on_table,
-																	'packet_in_rate': self.n_packet_in, 'number_of_errors': self.n_errors ,'flow_table_stats': flow_table_stats,
+																	'removed_flow_byte_per_packet': flow_average_byte_per_packet, 'removed_average_byte_per_sec': removed_average_byte_per_sec, 'average_flow_duration_on_table': average_flow_duration_on_table,
+																	'packet_in_rate': self.n_packet_in, 'removed_flows_count': len(self.flow_removed), 'number_of_errors': self.n_errors ,'flow_table_stats': flow_table_stats,
 																	'flow_table_stats_durations': flow_table_stats_durations, 'removed_table_stats': removed_table_stats, 'removed_table_stats_durations':removed_table_stats_durations }
-		detect_attack(self.history_batches)
+		check_attack(self.history_batches)
 		
 
 		if(len(self.history_batches) > 30 ) :

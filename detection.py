@@ -17,7 +17,7 @@ class Detection:
   def __init__(self, switch, detection_type, switch_app):
     from switch_class import Switch  # Import here to avoid circular dependency at module load
     assert isinstance(switch, Switch)
-    from switch import SimpleSwitch13  # Import here to avoid circular dependency at module load
+    from controller import SimpleSwitch13  # Import here to avoid circular dependency at module load
     assert isinstance(switch_app, SimpleSwitch13)
     print("init-detection with type: " + str(detection_type))
     self.switch = switch
