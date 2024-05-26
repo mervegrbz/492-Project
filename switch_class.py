@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import data_classes as data_model
 from detection import *
-import statistics
+
 from detector import detect_attack
 from parameters import TABLE_CAPACITY, UPPER_THRESHOLD_STD_DEV, MEAN_THRESHOLD, LOWER_THRESHOLD_STD_DEV, CAPACITY_THRESHOLD, HIGH_RATE_FLAG, LOW_RATE_FLAG, IDLE_TIMEOUT
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -184,7 +184,7 @@ class Switch:
 		
 	# This method may work every seconds to keep track of the flow table, it has a counter and when it reaches 5 (every 5 sec) it checks for low-rate attacks
 	def flow_table_stats(self):
-		print("flow_table_stats")
+
 		capacity_used = self.calc_occupance_rate()
 		flow_average_duration, flow_average_byte_per_packet = self.calc_removed_flows()
 		average_flow_duration_on_table = self.average_duration_on_flow_table()
