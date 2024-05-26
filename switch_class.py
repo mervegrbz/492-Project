@@ -51,7 +51,7 @@ class Switch:
 		columns = ['timestamp', 'capacity_used', 
              'removed_flow_average_duration', 'removed_flow_byte_per_packet', 'removed_average_byte_per_sec',
              'average_flow_duration_on_table', 'packet_in_rate', 'removed_flows_count', 'number_of_errors',
-             'flow_table_stats', 'flow_table_stats_durations' 'removed_table_stats', 'removed_table_stats_durations']
+             'flow_table_stats', 'flow_table_stats_durations' 'removed_table_stats', 'removed_table_stats_durations', 'is_attack']
 		self.history_batches = pd.DataFrame(columns=columns)  
 		self.flow_rules = pd.DataFrame(columns=['ipv4_src','ipv4_dst','port_src','port_dst','ip_proto', 'actions', 'cookie', 'duration_sec', 'byte_count', 'packet_count', 'idle_timeout', 'timestamp'])
 		self.scheduler = BackgroundScheduler()
@@ -107,6 +107,8 @@ class Switch:
 					self.flow_table.remove(flow)
 					# if flow removed not because of mitigation, append it to flow_removed list to use it later as a normal removed flows
 					if (flow['reason'] == 'IDLE TIMEOUT' or flow['reason'] == 'HARD TIMEOUT'):
+						is_attack = flow['is_attack']
+						current_flow['is_attack'] = is_attack  # Carry forward the is_attack field
 						self.flow_removed.append(current_flow)
 
 
@@ -191,11 +193,13 @@ class Switch:
 		average_flow_duration_on_table = self.average_duration_on_flow_table()
 		flow_table_stats, flow_table_stats_durations = self.flow_mod_statistics(self.flow_table, False)
 		removed_table_stats, removed_table_stats_durations = self.flow_mod_statistics(self.flow_removed, True)
+		is_attack = self.check_is_attack()
 		print(time.time(), capacity_used, flow_average_duration, flow_average_byte_per_packet, average_flow_duration_on_table)
 		self.history_batches.loc[len(self.history_batches)] = {'timestamp': time.time(), 'capacity_used': capacity_used, 'removed_flow_average_duration': flow_average_duration,
 																	'removed_flow_byte_per_packet': flow_average_byte_per_packet, 'removed_average_byte_per_sec': removed_average_byte_per_sec, 'average_flow_duration_on_table': average_flow_duration_on_table,
 																	'packet_in_rate': self.n_packet_in, 'removed_flows_count': len(self.flow_removed), 'number_of_errors': self.n_errors ,'flow_table_stats': flow_table_stats,
-																	'flow_table_stats_durations': flow_table_stats_durations, 'removed_table_stats': removed_table_stats, 'removed_table_stats_durations':removed_table_stats_durations }
+																	'flow_table_stats_durations': flow_table_stats_durations, 'removed_table_stats': removed_table_stats, 
+																	'removed_table_stats_durations':removed_table_stats_durations, 'is_attack': is_attack}
 		check_attack(self.history_batches)
 		
 
@@ -205,3 +209,14 @@ class Switch:
 		
 	def get_related_batch(self, num_of_batch=5):
 		return self.history_batches[-num_of_batch:] if len(self.history_batches)>num_of_batch else self.history_batches
+	
+	# check whether switch is under attack
+	# TODO atak flowu varsa direkt atak da diyebiliriz, çoğunluk olunca da hangisi daha mantıklı? normal capacity %70'se çoğunluk olamaz mesela
+	# ama ML eğitirken pek bir şey etkilemediği halde atak dersek de sorun olabilir.
+	def check_is_attack(self):
+		attack_flows = [flow for flow in self.flow_table if flow['is_attack']]
+		normal_flows = [flow for flow in self.flow_table if not flow['is_attack']]
+		if len(normal_flows) / 4.0 > len(attack_flows):
+			return 0
+		else:
+			return 1

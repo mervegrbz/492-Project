@@ -94,7 +94,7 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 				columns = ['timestamp', 'capacity_used', 
              'removed_flow_average_duration', 'removed_flow_byte_per_packet', 'removed_average_byte_per_sec',
              'average_flow_duration_on_table', 'packet_in_rate', 'removed_flows_count', 'number_of_errors',
-             'flow_table_stats', 'flow_table_stats_durations' 'removed_table_stats', 'removed_table_stats_durations']
+             'flow_table_stats', 'flow_table_stats_durations' 'removed_table_stats', 'removed_table_stats_durations', 'is_attack']
 				
 				removed_flow_average_duration = related_batch['removed_flow_average_duration'].mean()
 				removed_flow_byte_per_packet = related_batch['removed_flow_byte_per_packet'].mean() # the second important feature to distunguish mice and elephant

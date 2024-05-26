@@ -87,10 +87,20 @@ class SimpleSwitch13(app_manager.RyuApp):
 				mod = ofp_parser.OFPFlowMod(datapath, cookie=cookie_num, cookie_mask=0xFFFFFFFFFFFFFFFF, table_id=0, command=ofp.OFPFC_ADD, idle_timeout=idle_timeout, hard_timeout=0,
 																		priority=priority, out_port=ofp.OFPP_ANY, out_group=ofp.OFPG_ANY,
 																		flags=ofp.OFPFF_SEND_FLOW_REM, match=match, instructions=inst)
+				
+			# Check for TCP/IP with SYN flag (hping3)
+			if match.get('ip_proto') == ofproto_v1_3.OFPHTN_IP and match.get('tcp_flags') & ofproto_v1_3.TCP_SYN:
+				print("TCP/IP SYN packet detected (likely hping3)")
+
+			# Check for UDP (iperf)
+			elif match.get('ip_proto') == ofproto_v1_3.OFPHTN_UDP:
+				print("UDP packet detected (likely iperf)")
+			
+			is_attack = False
 			flow_mod = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id,
 												'match':format_match(mod.match), 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags,
 												'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout,
-												'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port}
+												'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port, 'is_attack': is_attack}
 			flow_list.append(flow_mod)
 			datapath.send_msg(mod)
 			# get the switch from switch_list from corresponding datapath_id, increment flow_mod, update the flow table
