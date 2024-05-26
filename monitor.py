@@ -54,7 +54,6 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 				req = parser.OFPFlowStatsRequest(datapath)
 				datapath.send_msg(req)
 
-		# TODO ne zaman giriyor buraya, stat request atınca mı?
 		@set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
 		def _flow_stats_reply_handler(self, ev):
 				timestamp = datetime.now()
@@ -91,7 +90,7 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 				columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet',
 						 'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev', 'number_of_errors'
 						 'flow_table_stats', 'removed_table_stats'] 
-				# TODO packet_in_std_dev nerde?
+
 				columns = ['timestamp', 'capacity_used', 
              'removed_flow_average_duration', 'removed_flow_byte_per_packet', 'removed_average_byte_per_sec',
              'average_flow_duration_on_table', 'packet_in_rate', 'removed_flows_count', 'number_of_errors',
@@ -102,7 +101,6 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 				removed_average_byte_per_sec = related_batch['removed_average_byte_per_sec'].mean() # the most important to distunguish
 				
 				for flow in flow_list:
-			  		## TODO buraya tüm flowlar mı geliyor? yoksa her switchinki sırayla mı geliyor?
 					if  flow[2] < BYTE_PER_SEC_BLACK_LIST * removed_average_byte_per_sec and flow[1] < BYTE_PER_PACKET_BLACK_LIST * removed_flow_byte_per_packet:
 						# TODO direkt buna göre girmemesi lazım normalde, banned listte sortlayıp ona göre blocklamak lazım
 						self.add_banned_list(flow)
@@ -112,7 +110,7 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 					if flow[1] > 2 * removed_flow_byte_per_packet: 
 						## TODO protect the whitelisted flows from being banned
 						self.add_white_list(flow)
-				## removed_flow_average_duration,removed_flow_byte_per_packet,average_flow_duration_on_table can be used to detect whether the flow is suspected or not
+
 				
 				
 				
