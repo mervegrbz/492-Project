@@ -2,11 +2,12 @@ from ryu.controller import ofp_event
 from ryu.controller.handler import MAIN_DISPATCHER, DEAD_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.lib import hub
-import detector
+import predictor
 import controller
 from datetime import datetime
 import pickle,os
 import pandas as pd
+from parameters import *
 
 class SimpleMonitor13(controller.SimpleSwitch13):
 
@@ -33,14 +34,16 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 
 		def _monitor(self):
 			while True:
-				if detector.LOW_RATE_FLAG:
+				if predictor.LOW_RATE_FLAG:
 					for dp in self.datapaths.values():
+						## TODO eger capacity cok yuksek degilse mitigation icin 3 stat daha beklenir burada capacity kontrol bir daha yapalim stat atmadan once eger azsa biraz bekleyelim
 						self._request_stats(dp)
-						detector.LOW_RATE_FLAG = False
-				if detector.HIGH_RATE_FLAG:
+						predictor.LOW_RATE_FLAG = False
+				if predictor.HIGH_RATE_FLAG:
 					for dp in self.datapaths.values():
+						# TODO no need to request stats in high rate, at first drop the newly appended flows
 						self._request_stats(dp)
-						detector.LOW_RATE_FLAG = False
+						predictor.LOW_RATE_FLAG = False
 				hub.sleep(5)
 
 
@@ -51,7 +54,7 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 				req = parser.OFPFlowStatsRequest(datapath)
 				datapath.send_msg(req)
 
-		# TODO ne zaman giriyor buraya
+		# TODO ne zaman giriyor buraya, stat request atınca mı?
 		@set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
 		def _flow_stats_reply_handler(self, ev):
 				timestamp = datetime.now()
@@ -78,31 +81,37 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 					elif stat.match['ip_proto'] == 17:
 							tp_src = match['udp_src']
 							tp_dst = match['udp_dst']
-					packet_count_per_second = stat.packet_count/stat.duration_sec if stat.duration_sec != 0 else 0
-					byte_count_per_second = stat.byte_count/stat.duration_sec if stat.duration_sec != 0 else 0
-					flow_list.append([ip_src,packet_count_per_second,byte_count_per_second, stat.cookie])
+					byte_per_packet = stat.byte_count/stat.packet_count if stat.packet_count != 0 else 0
+					byte_count_per_second = stat.byte_count/float(stat.duration_sec) if stat.duration_sec != 0 else 0
+					flow_list.append([ip_src,byte_per_packet,byte_count_per_second, stat.cookie])
 			
 				switch = self.switch_list[ev.msg.datapath.id]
 				# switch has the history batches of flow statistics get the related columns and compare it with current flow to understand whether it is suspected or not
 				related_batch = switch.get_related_batch(num_of_batch=5)
 				columns = ['timestamp', 'capacity_used', 'removed_flow_average_duration', 'removed_flow_byte_per_packet',
 						 'average_flow_duration_on_table', 'packet_in_mean', 'packet_in_std_dev', 'number_of_errors'
-						 'flow_table_stats', 'removed_table_stats']
+						 'flow_table_stats', 'removed_table_stats'] 
+				# TODO packet_in_std_dev nerde?
+				columns = ['timestamp', 'capacity_used', 
+             'removed_flow_average_duration', 'removed_flow_byte_per_packet', 'removed_average_byte_per_sec',
+             'average_flow_duration_on_table', 'packet_in_rate', 'removed_flows_count', 'number_of_errors',
+             'flow_table_stats', 'flow_table_stats_durations' 'removed_table_stats', 'removed_table_stats_durations']
+				
 				removed_flow_average_duration = related_batch['removed_flow_average_duration'].mean()
-				removed_flow_byte_per_packet = related_batch['removed_flow_byte_per_packet'].mean()
+				removed_flow_byte_per_packet = related_batch['removed_flow_byte_per_packet'].mean() # the second important feature to distunguish mice and elephant
+				removed_average_byte_per_sec = related_batch['removed_average_byte_per_sec'].mean() # the most important to distunguish
 				
 				for flow in flow_list:
-			## TODO eger capacity cok yuksek degilse mitigation icin 3 stat daha beklenir burada capacity kontrol bir daha yapalim stat atmadan once eger azsa biraz bekleyelim
-      ## TODO eger capacity cok yuksek degilse mitigation icin 3 stat daha beklenir burada capacity kontrol bir daha yapalim stat atmadan once eger azsa biraz bekleyelim
-	  	# TODO avg durationdan küçükse niye banlıyoz?
-						if flow[1] < 0.8 * removed_flow_byte_per_packet and flow[2] > 0.8 * removed_flow_average_duration:
-								self.add_banned_list(flow)
-								self.drop_flow(datapath, flow[3])
-								self.block_ip(datapath, flow[0] )
+			  		## TODO buraya tüm flowlar mı geliyor? yoksa her switchinki sırayla mı geliyor?
+					if  flow[2] < BYTE_PER_SEC_BLACK_LIST * removed_average_byte_per_sec and flow[1] < BYTE_PER_PACKET_BLACK_LIST * removed_flow_byte_per_packet:
+						# TODO direkt buna göre girmemesi lazım normalde, banned listte sortlayıp ona göre blocklamak lazım
+						self.add_banned_list(flow)
+						self.drop_flow(datapath, flow[3])
+						self.block_ip(datapath, flow[0] )
 
-						if flow[1] > 2 * removed_flow_byte_per_packet: 
-								## TODO protect the whitelisted flows from being banned
-								self.add_white_list(flow)
+					if flow[1] > 2 * removed_flow_byte_per_packet: 
+						## TODO protect the whitelisted flows from being banned
+						self.add_white_list(flow)
 				## removed_flow_average_duration,removed_flow_byte_per_packet,average_flow_duration_on_table can be used to detect whether the flow is suspected or not
 				
 				
