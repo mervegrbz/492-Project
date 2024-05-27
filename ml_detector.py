@@ -51,3 +51,12 @@ def apply_model(data_train, data_test, label_train, label_test, model_type):
     print(classification_report(label_test, prediction))
     print(model_type.name + " Confusion Matrix:\n", confusion_matrix(label_test, prediction))
 
+def create_model(history_batch):
+    data_train, data_test, label_train, label_test = preprocessing_data(history_batch)
+    apply_model(data_train, data_test, label_train, label_test, ML_Model.KNN)
+    apply_model(data_train, data_test, label_train, label_test, ML_Model.RANDOM_FOREST)
+    apply_model(data_train, data_test, label_train, label_test, ML_Model.SVM)
+    apply_model(data_train, data_test, label_train, label_test, ML_Model.XGBOOST)
+    
+def load_model():
+    return None

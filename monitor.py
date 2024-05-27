@@ -8,7 +8,8 @@ from datetime import datetime
 import pickle,os
 import pandas as pd
 from parameters import *
-
+from flow_inspector import ml_flow
+from detector import flow_labeller
 class SimpleMonitor13(controller.SimpleSwitch13):
 
 		def __init__(self, *args, **kwargs):
@@ -64,7 +65,11 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 				tp_src = 0
 				tp_dst = 0
 				flow_list = []
+				## store the flows in the body in a dataframe
+				flow_rules = pd.DataFrame(columns=['ipv4_src','ipv4_dst','port_src','port_dst','ip_proto', 'cookie', 'duration_sec', 'byte_count', 'packet_count'])
+    
 				for stat in body:
+
 					match = controller.format_match(stat.match)
 					if ( match == {} or 'ip_proto' not in  match ):
 			 				continue
@@ -80,10 +85,13 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 					elif stat.match['ip_proto'] == 17:
 							tp_src = match['udp_src']
 							tp_dst = match['udp_dst']
-					byte_per_packet = stat.byte_count/stat.packet_count if stat.packet_count != 0 else 0
-					byte_count_per_second = stat.byte_count/float(stat.duration_sec) if stat.duration_sec != 0 else 0
-					flow_list.append([ip_src,byte_per_packet,byte_count_per_second, stat.cookie])
-			
+					row = pd.Series([ip_src, ip_dst, tp_src, tp_dst, ip_proto, stat.cookie, stat.duration_sec, stat.byte_count, stat.packet_count], index=flow_rules.columns)
+					flow_rules = flow_rules.append(row, ignore_index=True)
+
+				flow_rules = ml_flow(flow_rules)
+				## get the suspected flows
+				# flow_rules = flow_labeller(flow_rules)
+				# suspected_flows = flow_rules[flow_rules['label'] == 1]
 				switch = self.switch_list[ev.msg.datapath.id]
 				# switch has the history batches of flow statistics get the related columns and compare it with current flow to understand whether it is suspected or not
 				related_batch = switch.get_related_batch(num_of_batch=5)
@@ -92,17 +100,14 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 				removed_flow_byte_per_packet = related_batch['removed_flow_byte_per_packet'].mean() # the second important feature to distunguish mice and elephant
 				removed_average_byte_per_sec = related_batch['removed_average_byte_per_sec'].mean() # the most important to distunguish
 				
-				for flow in flow_list:
-					if  flow[2] < BYTE_PER_SEC_BLACK_LIST * removed_average_byte_per_sec and flow[1] < BYTE_PER_PACKET_BLACK_LIST * removed_flow_byte_per_packet:
-						# TODO direkt buna göre girmemesi lazım normalde, banned listte sortlayıp ona göre blocklamak lazım
+    
+				for index, flow in flow_rules.iterrows():
+					if flow['bps'] < BYTE_PER_SEC_BLACK_LIST * removed_average_byte_per_sec and flow['bpp'] < BYTE_PER_PACKET_BLACK_LIST * removed_flow_byte_per_packet:
 						self.add_banned_list(flow)
-						self.drop_flow(datapath, flow[3])
-						self.block_ip(datapath, flow[0] )
-
-					if flow[1] > 2 * removed_flow_byte_per_packet: 
-						## TODO protect the whitelisted flows from being banned
+						self.drop_flow(datapath, flow['cookie'])
+						self.block_ip(datapath, flow['ipv4_src'] )
+					if flow['bps'] > 2 * removed_average_byte_per_sec:
 						self.add_white_list(flow)
-
 				
 				
 				
