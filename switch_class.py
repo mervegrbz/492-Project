@@ -3,8 +3,6 @@ import time
 from enum import Enum
 import numpy as np
 import pandas as pd
-import data_classes as data_model
-from detection import *
 import statistics
 from predictor import *
 from parameters import *

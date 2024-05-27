@@ -12,11 +12,6 @@ LOW_RATE_FLAG = False
 def check_low_rate_attack(data):
     capacity_derivatives = data['capacity_used'][-5:].diff(periods=1)
     # if all of last 5 occupancy rates are increased
-    entropy = get_entropy(capacity_derivatives)
-    if (entropy < 0.1):
-        print("Low Rate Attack Detected because of entropy")
-        LOW_RATE_FLAG = True
-        return True
     if all(x > 0 for x in capacity_derivatives):
         print("Occupancy Rate is increased consistently in last 5 batches")
         if check_removed_flows(data):

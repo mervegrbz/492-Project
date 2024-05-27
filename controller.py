@@ -7,7 +7,6 @@ from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet, ipv4, tcp, udp, icmp, in_proto
 from ryu.lib.packet import ether_types
 from ryu import utils
-import data_classes as datamodel
 from datetime import datetime
 from parameters import IDLE_TIMEOUT, BAN_TIMEOUT
 import switch_class
@@ -105,8 +104,6 @@ class SimpleSwitch13(app_manager.RyuApp):
 			datapath.send_msg(mod)
 			# get the switch from switch_list from corresponding datapath_id, increment flow_mod, update the flow table
 			switch = self.switch_list[datapath.id]
-			flow = datamodel.FlowMod(datapath_id=datapath.id, timestamp=timestamp, match=mod.match, command=mod.command, flags=mod.flags, idle_timeout=mod.idle_timeout, hard_timeout=mod.hard_timeout,
-							 priority=mod.priority, buffer_id = mod.buffer_id, out_port = mod.out_port, cookie=mod.cookie)
 			switch.update_flow_table(flow_mod, switch_class.FLOW_OPERATION.ADD)
 	# writing logs
 	def write_to_csv(self):
@@ -129,9 +126,6 @@ class SimpleSwitch13(app_manager.RyuApp):
 		flow_mod = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id, 'match': format_match(mod.match), 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags, 'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout, 'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port }
 		flow_list.append(flow_mod)
 		switch = self.switch_list[datapath.id]
-		# flow = datamodel.FlowMod(datapath_id=datapath.id, timestamp=timestamp, match=mod.match, command=mod.command, flags=mod.flags, idle_timeout=mod.idle_timeout, hard_timeout=mod.hard_timeout,
-		# 					 priority=mod.priority, buffer_id = mod.buffer_id, out_port = mod.out_port, cookie=mod.cookie)
-		# switch.update_flow_table(flow_mod, switch_class.FLOW_OPERATION.ADD)
 		datapath.send_msg(mod)
 	
 	## Function adds a empty action that implies the dropping the packets coming from related ip_src
