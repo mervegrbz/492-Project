@@ -53,7 +53,7 @@ class Switch:
              'average_flow_duration_on_table', 'packet_in_rate', 'removed_flows_count', 'number_of_errors',
              'flow_table_stats', 'flow_table_stats_durations' 'removed_table_stats', 'removed_table_stats_durations', 'is_attack']
 		self.history_batches = pd.DataFrame(columns=columns)  
-		self.flow_rules = pd.DataFrame(columns=['ipv4_src','ipv4_dst','port_src','port_dst','ip_proto', 'actions', 'cookie', 'duration_sec', 'byte_count', 'packet_count', 'idle_timeout', 'timestamp'])
+		self.flow_rules = pd.DataFrame(columns=['ipv4_src','ipv4_dst','port_src','port_dst','ip_proto', 'cookie', 'duration_sec', 'byte_count', 'packet_count'])
 		self.scheduler = BackgroundScheduler()
 		self.scheduler.add_job(self.flow_table_stats, 'interval', seconds=5)
 		self.scheduler.start()
@@ -124,11 +124,11 @@ class Switch:
 			self.flow_rules.loc[row_index, 'packet_count'] = flow['packet_count']
 		if (operation == FLOW_OPERATION.ADD):
 			if (flow['match']['ip_proto'] == 6):
-				_flow = {'ipv4_src': flow['match']['ipv4_src'], 'ipv4_dst': flow['match']['ipv4_dst'], 'port_src': flow['match']['tcp_src'], 'port_dst': flow['match']['tcp_dst'], 'ip_proto': flow['match']['ip_proto'], 'cookie': flow['cookie'], 'idle_timeout': flow['idle_timeout'], 'timestamp': time.time(), 'duration_sec': 0, 'byte_count': 0, 'packet_count': 0}
+				_flow = {'ipv4_src': flow['match']['ipv4_src'], 'ipv4_dst': flow['match']['ipv4_dst'], 'port_src': flow['match']['tcp_src'], 'port_dst': flow['match']['tcp_dst'], 'ip_proto': flow['match']['ip_proto'], 'cookie': flow['cookie'], 'duration_sec': 0, 'byte_count': 0, 'packet_count': 0}
 			if (flow['match']['ip_proto'] == 17):
-				_flow = {'ipv4_src': flow['match']['ipv4_src'], 'ipv4_dst': flow['match']['ipv4_dst'], 'port_src': flow['match']['udp_src'], 'port_dst': flow['match']['udp_dst'], 'ip_proto': flow['match']['ip_proto'], 'cookie': flow['cookie'], 'idle_timeout': flow['idle_timeout'], 'timestamp': time.time(),'duration_sec': 0, 'byte_count': 0, 'packet_count': 0}
+				_flow = {'ipv4_src': flow['match']['ipv4_src'], 'ipv4_dst': flow['match']['ipv4_dst'], 'port_src': flow['match']['udp_src'], 'port_dst': flow['match']['udp_dst'], 'ip_proto': flow['match']['ip_proto'], 'cookie': flow['cookie'],'duration_sec': 0, 'byte_count': 0, 'packet_count': 0}
 			if (flow['match']['ip_proto'] == 1):
-				_flow = {'ipv4_src': flow['match']['ipv4_src'], 'ipv4_dst': flow['match']['ipv4_dst'], 'port_src': flow['match']['icmpv4_type'], 'port_dst': flow['match']['icmpv4_code'], 'ip_proto': flow['match']['ip_proto'], 'cookie': flow['cookie'], 'idle_timeout': flow['idle_timeout'], 'timestamp': time.time(),'duration_sec': 0, 'byte_count': 0, 'packet_count': 0}
+				_flow = {'ipv4_src': flow['match']['ipv4_src'], 'ipv4_dst': flow['match']['ipv4_dst'], 'port_src': flow['match']['icmpv4_type'], 'port_dst': flow['match']['icmpv4_code'], 'ip_proto': flow['match']['ip_proto'], 'cookie': flow['cookie'], 'duration_sec': 0, 'byte_count': 0, 'packet_count': 0}
 			if (_flow !={}):
 				self.flow_rules.loc[len(self.flow_rules)] = _flow
 		
@@ -202,7 +202,6 @@ class Switch:
 																	'removed_table_stats_durations':removed_table_stats_durations, 'is_attack': is_attack}
 		check_attack(self.history_batches)
 		
-
 		if(len(self.history_batches) > 30 ) :
 			self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
 

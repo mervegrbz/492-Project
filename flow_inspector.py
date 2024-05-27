@@ -1,6 +1,6 @@
 import pandas as pd
 from scipy.stats import zscore
-def feature_extractor(flow, flow_table):
+def feature_extractor(flow):
   duration = flow['duration_sec']
   packet = flow['packet_count']
   byte = flow['byte_count']
@@ -8,7 +8,7 @@ def feature_extractor(flow, flow_table):
   bps = byte / duration
   bpp = byte / packet
   interarrival_time = duration / packet
-  return {'duration': duration, 'packet': packet, 'byte': byte, 'pps': pps, 
+  return {'cookie': flow['cookie'], 'duration': duration, 'packet': packet, 'byte': byte, 'pps': pps, 
           'bps': bps, 'bpp': bpp, 'interarrival_time': interarrival_time}
   
 
@@ -36,3 +36,21 @@ def get_flow_rule_statistics(flow_table):
         data[key]['z_score-{}'.format(key)] = zscore(data[key]['count-{}'.format(key)])
         df = pd.merge(df, data[key], on=key, how='left')
     return df
+
+def ml_flow(flow_table):
+    ## get the flow_features for each flow
+    flow_features = flow_table.apply(lambda x: feature_extractor(x, flow_table), axis=1)
+    ## flow features are in the form of dictionary, convert it to dataframe
+    flow_features = pd.DataFrame(flow_features)
+    ## get flow_statistics
+    flow_statistics = get_flow_rule_statistics(flow_table)
+    ml_flow = pd.merge(flow_features, flow_statistics, on='cookie', how='left')
+    ml_flow = ml_flow.drop(['ipv4_src', 'ipv4_dst', 'ipv4_src-ipv4_dst', 'ipv4_src-ip_proto', 'count-ipv4_src', 'count-ipv4_dst', 'count-ipv4_src-ipv4_dst', 'count-ipv4_src-ip_proto'], axis=1)
+    ## create new dataframe with columns 'cookie', 'duration', 'packet_count', 'byte_count', 'pps', 'bps', 'bpp', 'interarrival_time', 'z_score- ipv4_src', 'z_score- ipv4_dst', 'z_score-ipv4_src-ipv4_dst', 'z_score-ipv4_src-ip_proto', 'label', 
+    flow_features['label'] = 0
+    return ml_flow
+    
+
+   
+    
+    
