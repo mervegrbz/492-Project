@@ -43,6 +43,8 @@ def apply_model(data_train, data_test, label_train, label_test, model_type, feat
         with open(model_filename, 'rb') as file:
             model = pickle.load(file)
         print(f"Loaded {model_type.name} model from {model_filename}")
+    
+    # if file does not exists, train the model and save it under the ml_models folder
     except FileNotFoundError:
         start_time = time.time()
         if model_type == ML_Model.KNN:
@@ -87,6 +89,7 @@ def feature_importance(model_type, model, feature_names):
         feature_importance = pd.Series(importances, index=feature_names).sort_values(ascending=False)
         print(model_type.name + " Feature Importance:\n", feature_importance)
 
+# it creates model stats
 def create_model_stats(train, test):
     data_train, data_test, label_train, label_test, feature_names = preprocessing_stats(train, test)
     apply_model(data_train, data_test, label_train, label_test, ML_Model.KNN, feature_names)
