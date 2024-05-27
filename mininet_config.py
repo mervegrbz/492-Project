@@ -37,45 +37,27 @@ class MininetTopo():
 
 if __name__ == '__main__':
     arguments = sys.argv
-    topology = 'linear'
-    number_of_switch = 2
-    number_of_host_per_switch = 1
-    topo = None
-    # runs on default configuration 
-    if len(arguments) == 1:
-        topo = MininetTopo()
-    elif len(arguments) == 2:
-        topology = arguments[1]
-        if topology == 'linear':
-            topo = MininetTopo()
-        elif topology == 'tree':
-            topo = MininetTopo()
-        else:
-            print('Invalid topology')
-            sys.exit(1)
-    elif len(arguments) > 3:
-        topology = arguments[1]
-        number_of_switch = int(arguments[2])
-        number_of_host_per_switch = int(arguments[3])
-        if topology == 'linear':
-            topo = MininetTopo()
-        elif topology == 'tree': 
-            topo = MininetTopo()
-        else:
-            print('Invalid topology')
-            sys.exit(1)
+    topology = arguments[1] if len(arguments) > 1 else 'linear'
+    number_of_switch = int(arguments[2]) if len(arguments) > 2 else 2
+
+    number_of_host_per_switch = int(arguments[3]) if len(arguments) > 3 else 1
+    topo = MininetTopo(topology, number_of_switch, number_of_host_per_switch)
     try:
         
         setLogLevel( 'debug' )
         print('Topology created')
         topo.start()
         topo.config_switch() 
-        h1 = topo.net.get('h1')
-        h2 = topo.net.get('h2')
-        h2.cmd('python3 -m http.server 80 &')
-        malicious = attack_sim.malicious_host('h1',h1,10)
-        malicious.attack_controller_ip(5, 60 ,number_of_host_per_switch*number_of_switch, 4)
-        # benign_traffic.traffic(topo.net, number_of_host_per_switch*number_of_switch )
+        a = topo.net.hosts
+        host = a[0]
+        switch = a[1]
+        host.cmd(f'ping {switch.IP()}')
+        # h1 = topo.net.get('h1')
+        # h2 = topo.net.get('h2')
+        # h2.cmd('python3 -m http.server 80 &')
+        # malicious = attack_sim.malicious_host('h1',h1,10)
+        # malicious.attack_controller_ip(5, 60 ,number_of_host_per_switch*number_of_switch, 4)
+        benign_traffic.traffic(topo.net, number_of_host_per_switch*number_of_switch )
         CLI( topo.net )
         print('CLI opened')
         topo.stop()
