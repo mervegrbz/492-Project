@@ -1,0 +1,14 @@
+TABLE_CAPACITY=50
+IDLE_TIMEOUT=10
+BAN_TIMEOUT=30
+UPPER_THRESHOLD_STD_DEV = 0.1
+MEAN_THRESHOLD = 0.1
+LOWER_THRESHOLD_STD_DEV = 0.01
+CAPACITY_THRESHOLD = 0.8 # capacity > %80 çoksa bunu artırabiliriz
+HIGH_RATE_FLAG = False
+LOW_RATE_FLAG = False
+HIGH_RATE_THRESHOLD=10 #  capacity > %80 çoksa ve high rate olduğu halde göremiyorsak
+DURATION_THRESHOLD=5 #  Low Rate'te False Positive çoksa bunu artırabiliriz
+BYTE_PER_PACKET_BLACK_LIST = 0.5
+BYTE_PER_SEC_BLACK_LIST = 0.5
+WHITE_LIST = 3
