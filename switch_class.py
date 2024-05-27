@@ -7,7 +7,7 @@ import statistics
 from predictor import *
 from parameters import *
 from apscheduler.schedulers.background import BackgroundScheduler
-
+from flow_inspector import ml_flow
 
 # we may arrange it w.r.t official document https://ryu.readthedocs.io/en/latest/ofproto_v1_3_ref.html command enumaration
 '''
@@ -195,12 +195,13 @@ class Switch:
 																	'packet_in_rate': self.n_packet_in, 'removed_flows_count': len(self.flow_removed), 'number_of_errors': self.n_errors ,'flow_table_stats': flow_table_stats,
 																	'flow_table_stats_durations': flow_table_stats_durations, 'removed_table_stats': removed_table_stats, 
 																	'removed_table_stats_durations':removed_table_stats_durations, 'is_attack': is_attack}
-		check_attack(self.history_batches)
-		
+		filtered_flow_table = self.flow_rules[self.flow_rules['byte_count'] != 0]
+		ml_flow_table = ml_flow(filtered_flow_table)
+		if(len(ml_flow_table) > 3):
+			ml_flow_table.to_csv(f'flow_table_{self.datapath_id}.csv')
 		if(len(self.history_batches) > 30 ) :
 			self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
-
-		
+		check_attack(self.history_batches)
 	def get_related_batch(self, num_of_batch=5):
 		return self.history_batches[-num_of_batch:] if len(self.history_batches)>num_of_batch else self.history_batches
 	

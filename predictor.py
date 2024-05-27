@@ -61,7 +61,7 @@ def get_entropy(data):
 def check_flow_durations(data):    
     mean_removed = data['removed_flow_average_duration'].mean()
     average_flow_duration_on_table_last_row = data['average_flow_duration_on_table'].iloc[-1]
-    if (average_flow_duration_on_table_last_row - mean_removed  > DURATION_THRESHOLD):
+    if (average_flow_duration_on_table_last_row - mean_removed  > DURATION_THRESHOLD and mean_removed > IDLE_TIMEOUT):
         print("Low Rate Attack Detected because of flow durations")
         return True
     return False
@@ -92,7 +92,7 @@ def check_attack(data):
 
     if (len(data) < 5 ):
         print('There is no enough data check_attack for specific type')
-        pass
+        return
     if check_high_rate_attack(data):
         HIGH_RATE_FLAG = True
     elif check_low_rate_attack(data):

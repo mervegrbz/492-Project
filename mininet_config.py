@@ -51,13 +51,12 @@ if __name__ == '__main__':
         a = topo.net.hosts
         host = a[0]
         switch = a[1]
-        host.cmd(f'ping {switch.IP()}')
         # h1 = topo.net.get('h1')
         # h2 = topo.net.get('h2')
         # h2.cmd('python3 -m http.server 80 &')
-        # malicious = attack_sim.malicious_host('h1',h1,10)
-        # malicious.attack_controller_ip(5, 60 ,number_of_host_per_switch*number_of_switch, 4)
-        benign_traffic.traffic(topo.net, number_of_host_per_switch*number_of_switch )
+        malicious = attack_sim.malicious_host('h1s1',host,10)
+        malicious.attack_controller_ip(5, 60 ,number_of_host_per_switch*number_of_switch, 4)
+        # benign_traffic.traffic(topo.net, number_of_host_per_switch*number_of_switch )
         CLI( topo.net )
         print('CLI opened')
         topo.stop()

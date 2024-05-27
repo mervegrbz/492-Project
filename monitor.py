@@ -72,7 +72,7 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 
 					match = controller.format_match(stat.match)
 					if ( match == {} or 'ip_proto' not in  match ):
-			 				continue
+			 			continue
 					ip_src = match['ipv4_src']
 					ip_dst = match['ipv4_dst']
 					ip_proto = match['ip_proto'] 
@@ -104,8 +104,8 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 				for index, flow in flow_rules.iterrows():
 					if flow['bps'] < BYTE_PER_SEC_BLACK_LIST * removed_average_byte_per_sec and flow['bpp'] < BYTE_PER_PACKET_BLACK_LIST * removed_flow_byte_per_packet:
 						self.add_banned_list(flow)
-						self.drop_flow(datapath, flow['cookie'])
-						self.block_ip(datapath, flow['ipv4_src'] )
+						# self.drop_flow(datapath, flow['cookie'])
+						# self.block_ip(datapath, flow['ipv4_src'] )
 					if flow['bps'] > 2 * removed_average_byte_per_sec:
 						self.add_white_list(flow)
 				

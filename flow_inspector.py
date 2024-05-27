@@ -38,15 +38,12 @@ def get_flow_rule_statistics(flow_table):
 
 def ml_flow(flow_table):
     if ( len(flow_table )<=0):
-        return   
+        return flow_table
     ## get the flow_features for each flow
     flow_features = flow_table.apply(lambda x: feature_extractor(x), axis=1)
-    print(flow_table)
-    print(type(flow_features))
-    
+
     ## flow features are in the form of dictionary, convert it to dataframe
     flow_features = pd.DataFrame(flow_features.tolist())
-    print(flow_features)
     ## get flow_statistics
     flow_statistics = get_flow_rule_statistics(flow_table)
     ml_flow = pd.merge(flow_features, flow_statistics, on='cookie', how='left')
