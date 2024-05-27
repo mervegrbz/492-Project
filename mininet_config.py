@@ -54,8 +54,16 @@ if __name__ == '__main__':
         # h1 = topo.net.get('h1')
         # h2 = topo.net.get('h2')
         # h2.cmd('python3 -m http.server 80 &')
+        from threading import Thread
         malicious = attack_sim.malicious_host('h1s1',host,10)
-        malicious.attack_controller_ip(5, 60 ,number_of_host_per_switch*number_of_switch, 4)
+        benign_thread = Thread(target=benign_traffic.traffic, args=(topo.net, number_of_host_per_switch*number_of_switch))
+        malicious_thread = Thread(target=malicious.attack_controller_ip, args=(5, 60 ,number_of_host_per_switch*number_of_switch, 4))
+        benign_thread.start()
+        malicious_thread.start()
+        benign_thread.join()
+        malicious_thread.join()
+        # malicious.attack_controller_ip(5, 60 ,number_of_host_per_switch*number_of_switch, 4)
+        
         # benign_traffic.traffic(topo.net, number_of_host_per_switch*number_of_switch )
         CLI( topo.net )
         print('CLI opened')
