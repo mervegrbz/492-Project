@@ -104,10 +104,7 @@ class Switch:
 					self.append_flow_rules(current_flow, operation)
 					self.flow_table.remove(flow)
 					# if flow removed not because of mitigation, append it to flow_removed list to use it later as a normal removed flows
-					if (flow['reason'] == 'IDLE TIMEOUT' or flow['reason'] == 'HARD TIMEOUT'):
-						is_attack = flow['is_attack']
-						current_flow['is_attack'] = is_attack  # Carry forward the is_attack field
-						self.flow_removed.append(current_flow)
+					self.flow_removed.append(current_flow)
 
 
 	def append_flow_rules(self, flow, operation):

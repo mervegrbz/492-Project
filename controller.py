@@ -88,12 +88,12 @@ class SimpleSwitch13(app_manager.RyuApp):
 																		flags=ofp.OFPFF_SEND_FLOW_REM, match=match, instructions=inst)
 				
 			# Check for TCP/IP with SYN flag (hping3)
-			if match.get('ip_proto') == ofproto_v1_3.OFPHTN_IP and match.get('tcp_flags') & ofproto_v1_3.TCP_SYN:
-				print("TCP/IP SYN packet detected (likely hping3)")
+			# if match.get('ip_proto') == ofproto_v1_3.OFPHTN_IP and match.get('tcp_flags') & ofproto_v1_3.TCP_SYN:
+				# print("TCP/IP SYN packet detected (likely hping3)")
 
 			# Check for UDP (iperf)
-			elif match.get('ip_proto') == ofproto_v1_3.OFPHTN_UDP:
-				print("UDP packet detected (likely iperf)")
+			# elif match.get('ip_proto') == ofproto_v1_3.OFPHTN_UDP:
+				# print("UDP packet detected (likely iperf)")
 			
 			is_attack = False
 			flow_mod = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id,

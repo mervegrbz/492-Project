@@ -86,7 +86,7 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 							tp_src = match['udp_src']
 							tp_dst = match['udp_dst']
 					row = pd.Series([ip_src, ip_dst, tp_src, tp_dst, ip_proto, stat.cookie, stat.duration_sec, stat.byte_count, stat.packet_count], index=flow_rules.columns)
-					flow_rules = flow_rules.append(row, ignore_index=True)
+					flow_rules.loc[len(flow_rules)] = row
 
 				flow_rules = ml_flow(flow_rules)
 				## get the suspected flows
