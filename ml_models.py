@@ -139,6 +139,9 @@ def applied_model(data_test, model_type, is_batch):
         with open(model_filename, 'rb') as file:
             model = pickle.load(file)
         print(f"Loaded {model_type.name} model from {model_filename}")
+        # TODO call it if it is labeled
+        data_test = data_test.drop(columns=['is_attack'])
+        #data_test = StandardScaler().transform(data_test)
     
     # if file does not exists, train the model and save it under the ml_models folder
     except FileNotFoundError:
@@ -156,9 +159,12 @@ def applied_model(data_test, model_type, is_batch):
         train_data = pd.read_csv(train_path)
         data_train, data_test_2, label_train, feature_names = None, None, None, None
         if (is_batch):
-            data_train, data_test_2, label_train, feature_names = preprocessing_batches(train_data, data_test)
+            #data_train, data_test_2, label_train, feature_names = preprocessing_batches_no_label(train_data, data_test)
+            data_train, data_test, label_train, label_test, feature_names = preprocessing_stats(train_data, data_test)
         else:
-            data_train, data_test_2, label_train, feature_names = preprocessing_batches_no_label(train_data, data_test)
+            #TODO call the commented one if your data has no label
+            # data_train, data_test, label_train, feature_names = preprocessing_stats_no_label(train_data, data_test)
+            data_train, data_test, label_train, label_test, feature_names = preprocessing_stats(train_data, data_test)
         model.fit(data_train, label_train)
 
         with open(model_filename, 'wb') as file:
@@ -166,7 +172,7 @@ def applied_model(data_test, model_type, is_batch):
         print(f"Saved {model_type.name} model to {model_filename}")
         print(model_type.name + " training time: " + str(time.time() - start_time))
 
-    data_test = StandardScaler().transform(data_test)
+
     prediction = model.predict(data_test)
     print(model_type.name + " prediction:", prediction)
 
@@ -204,4 +210,5 @@ test_path = 'test_data/test_data_new1.csv'
 train_path = 'train_data/train_data_new1.csv'
 train_data = pd.read_csv(train_path)
 test_data = pd.read_csv(test_path)
-create_model_stats(train_data, test_data, is_batch)
+applied_model(test_data,  ML_Model.SVM, is_batch)
+#create_model_stats(train_data, test_data, is_batch)
