@@ -42,9 +42,10 @@ def run_real_data(topo):
         print(interface)
         host.cmd(f'tcpreplay -i  {interface}  -tK univ1_pt1 ')
 def delayed_detection(malicious ):
-    sleep(30)
+    ### important parameter
+    sleep(3)
     print('attack')
-    malicious.attack_controller_ip(5, 60 ,number_of_host_per_switch*number_of_switch, 10)
+    malicious.attack_protocol_change(5, 60 ,number_of_host_per_switch*number_of_switch, 5)
     
 if __name__ == '__main__':
     arguments = sys.argv
@@ -66,11 +67,11 @@ if __name__ == '__main__':
         malicious = attack_sim.malicious_host('h1s1',host,10)
         benign_thread = Thread(target=benign_traffic.traffic, args=(topo.net, number_of_host_per_switch*number_of_switch))
         malicious_thread = Thread(target=delayed_detection, args=(malicious,))
-        benign_thread.start()
+        # benign_thread.start()
         
         malicious_thread.start()
-        benign_thread.join()
-        # malicious_thread.join()
+        # benign_thread.join()
+        malicious_thread.join()
                 ## run tcreplay
         # run_real_data(topo)
         

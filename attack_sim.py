@@ -56,3 +56,31 @@ class malicious_host():
         self.net.cmd(j)
         sleep(0.1)
       count = len(self.attacks)
+      
+  def attack_protocol_change(self,attack_interval, attack_number, number_of_hosts=2, step=10):
+    victim_ip = ip_generator(number_of_hosts) 
+    while (victim_ip == self.net.IP()):
+      victim_ip = ip_generator(number_of_hosts)
+    available_protocol = ['--icmp', '--tcp', '--udp']
+    count = 0
+    while( count<attack_number):
+      sleep(attack_interval)
+      for i in range(step):
+        attack_port = randint(80, 65000)
+        rand_protocol = choice(available_protocol)
+        attack = ''
+        if rand_protocol == '--icmp':
+          icmp_type = randint(0,30)
+          icmp_code = randint(0,15)
+          attack = f'hping3 -2 -p {rand_protocol} --icmptype {icmp_type} --icmpcode {icmp_code} -d 5 -c 1 {victim_ip}'
+        elif rand_protocol == '--tcp':
+          attack = f'hping3 -S -d 10  -s  {attack_port} -p 80 -c 1 {victim_ip} &'
+        else:
+          attack = f'hping3    {rand_protocol} -d 10 --baseport {attack_port}  --destport 80 -c 1 {victim_ip} &'
+        self.attacks.append(attack)
+      for j in self.attacks:
+        self.net.cmd(j)
+        sleep(0.1)
+      count = len(self.attacks)
+      
+  
