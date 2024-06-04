@@ -125,7 +125,79 @@ def create_model_stats(train, test, is_batch):
     apply_model(data_train, data_test, label_train, label_test, ML_Model.SVM, feature_names, is_batch)
     apply_model(data_train, data_test, label_train, label_test, ML_Model.XGBOOST, feature_names, is_batch)
 
+# can be used in monitor
+def applied_model(data_test, model_type, is_batch):
+    model = None
+    model_filename = ""
+    if (is_batch):
+        model_filename = f"history_batches_ml_models/{model_type.name.lower()}_model.pkl"
+    else:
+        model_filename = f"flow_rules_ml_models/{model_type.name.lower()}_model.pkl"
+    
+    # Check if the model file exists, if not, train and save the model
+    try:
+        with open(model_filename, 'rb') as file:
+            model = pickle.load(file)
+        print(f"Loaded {model_type.name} model from {model_filename}")
+    
+    # if file does not exists, train the model and save it under the ml_models folder
+    except FileNotFoundError:
+        start_time = time.time()
+        if model_type == ML_Model.KNN:
+            model = KNeighborsClassifier(n_neighbors=5)
+        elif model_type == ML_Model.RANDOM_FOREST:
+            model = RandomForestClassifier(n_estimators=100, random_state=42)
+        elif model_type == ML_Model.SVM:
+            model = SVC(kernel='linear', random_state=42)
+        else:
+            model = xgb.XGBClassifier(use_label_encoder=False, eval_metric='mlogloss', random_state=42)
 
+        train_path = 'train_data/train_data_new1.csv'
+        train_data = pd.read_csv(train_path)
+        data_train, data_test_2, label_train, feature_names = None, None, None, None
+        if (is_batch):
+            data_train, data_test_2, label_train, feature_names = preprocessing_batches(train_data, data_test)
+        else:
+            data_train, data_test_2, label_train, feature_names = preprocessing_batches_no_label(train_data, data_test)
+        model.fit(data_train, label_train)
+
+        with open(model_filename, 'wb') as file:
+            pickle.dump(model, file)
+        print(f"Saved {model_type.name} model to {model_filename}")
+        print(model_type.name + " training time: " + str(time.time() - start_time))
+
+    data_test = StandardScaler().transform(data_test)
+    prediction = model.predict(data_test)
+    print(model_type.name + " prediction:", prediction)
+
+def preprocessing_stats_no_label(train, data_test):
+    # Preprocessing
+    data_train = train.drop(columns=['is_attack'])
+    label_train = train['is_attack']
+    
+    feature_names = data_train.columns
+
+    # Standardizing the data
+    scaler = StandardScaler()
+    data_train = scaler.fit_transform(data_train)
+    data_test = scaler.transform(data_test)
+
+    return data_train, data_test, label_train, feature_names
+
+def preprocessing_batches_no_label(train, test):
+    # Drop non-numeric columns
+    data_train = train.drop(columns=['timestamp', 'flow_table_stats', 'removed_table_stats', 'flow_table_stats_durations', 'removed_table_stats_durations', 'is_attack'])
+    label_train = train['is_attack']
+
+    feature_names = data_train.columns
+    data_test = test.drop(columns=['timestamp', 'flow_table_stats', 'removed_table_stats', 'flow_table_stats_durations', 'removed_table_stats_durations', 'is_attack'])
+
+    # Standardizing the data
+    scaler = StandardScaler()
+    data_train = scaler.fit_transform(data_train)
+    data_test = scaler.transform(data_test)
+
+    return data_train, data_test, label_train, feature_names
 
 is_batch = False
 test_path = 'test_data/test_data_new1.csv'

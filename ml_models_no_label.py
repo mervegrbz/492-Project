@@ -38,7 +38,7 @@ def preprocessing_batches(train, test):
     label_train = train['is_attack']
 
     feature_names = data_train.columns
-    data_test = test.drop(columns=['is_attack'])
+    data_test = test.drop(columns=['timestamp', 'flow_table_stats', 'removed_table_stats', 'flow_table_stats_durations', 'removed_table_stats_durations', 'is_attack'])
 
     # Standardizing the data
     scaler = StandardScaler()
