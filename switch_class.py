@@ -100,7 +100,7 @@ class Switch:
 
 		elif operation == FLOW_OPERATION.DELETE:
 			for flow in self.flow_table:
-				if flow['cookie'] == current_flow['cookie']:
+				if flow['match'] == current_flow['match']:
 					self.append_flow_rules(current_flow, operation)
 					self.flow_table.remove(flow)
 					# if flow removed not because of mitigation, append it to flow_removed list to use it later as a normal removed flows
@@ -199,7 +199,7 @@ class Switch:
 		ml_flow_table = ml_flow(filtered_flow_table)
 		if(len(ml_flow_table) > 3):
 			ml_flow_table.to_csv(f'flow_table_{self.datapath_id}.csv')
-		if(len(self.history_batches) > 30 ) :
+		if(len(self.history_batches) > 10 ) :
 			self.history_batches.to_csv(f'history_batches_{self.datapath_id}.csv')
 		check_attack(self.history_batches)
 	def get_related_batch(self, num_of_batch=5):

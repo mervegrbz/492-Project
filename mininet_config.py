@@ -8,7 +8,7 @@ from parameters import TABLE_CAPACITY
 import sys
 import benign_traffic
 import attack_sim
-
+from time import sleep
 class MininetTopo():
     def __init__(self, topology = 'linear', number_of_switch = 2 , number_of_host_per_switch = 1):
         if topology == 'linear':
@@ -33,8 +33,19 @@ class MininetTopo():
         self.net.pingAll()
     def stop(self):
         self.net.stop()
-        
-
+    
+def run_real_data(topo):
+    # for each hosts in the network run the real data coming from uni1_1.pcap
+    hosts = topo.net.hosts
+    for host in hosts:
+        interface = host.intf()
+        print(interface)
+        host.cmd(f'tcpreplay -i  {interface}  -tK univ1_pt1 ')
+def delayed_detection(malicious ):
+    sleep(30)
+    print('attack')
+    malicious.attack_controller_ip(5, 60 ,number_of_host_per_switch*number_of_switch, 10)
+    
 if __name__ == '__main__':
     arguments = sys.argv
     topology = arguments[1] if len(arguments) > 1 else 'linear'
@@ -51,20 +62,20 @@ if __name__ == '__main__':
         a = topo.net.hosts
         host = a[0]
         switch = a[1]
-        # h1 = topo.net.get('h1')
-        # h2 = topo.net.get('h2')
-        # h2.cmd('python3 -m http.server 80 &')
         from threading import Thread
         malicious = attack_sim.malicious_host('h1s1',host,10)
         benign_thread = Thread(target=benign_traffic.traffic, args=(topo.net, number_of_host_per_switch*number_of_switch))
-        malicious_thread = Thread(target=malicious.attack_controller_ip, args=(5, 60 ,number_of_host_per_switch*number_of_switch, 4))
+        malicious_thread = Thread(target=delayed_detection, args=(malicious,))
         benign_thread.start()
+        
         malicious_thread.start()
         benign_thread.join()
-        malicious_thread.join()
-        # malicious.attack_controller_ip(5, 60 ,number_of_host_per_switch*number_of_switch, 4)
+        # malicious_thread.join()
+                ## run tcreplay
+        # run_real_data(topo)
         
-        # benign_traffic.traffic(topo.net, number_of_host_per_switch*number_of_switch )
+        # use 
+
         CLI( topo.net )
         print('CLI opened')
         topo.stop()
