@@ -1,6 +1,49 @@
 import pandas as pd
+from sklearn.model_selection import train_test_split
+
+
+
 
 # Load the CSV files
+def load_csv_data(file_path):
+    return pd.read_csv(file_path)
+
+def combine_flow_tables(flow_table_1, flow_table_2):
+    return pd.concat([flow_table_1, flow_table_2], ignore_index=True)
+
+def store_flow_table(flow_table, stored_path, is_attack):
+    #flow_table['is_attack'] = is_attack
+    flow_table.to_csv(stored_path, index=False)
+    flow_table.head()
+
+def create_test_set(train_data, new_train_path, test_path):
+    # Split the data into training and test sets
+    train_set, test_set = train_test_split(train_data, test_size=0.2, random_state=42)
+    # Save the test set to a CSV file
+    test_set.to_csv(test_path, index=False)
+    # Optionally, save the new training set to a CSV file
+    train_set.to_csv(new_train_path, index=False)
+
+
+train_data = load_csv_data('train_data/train_data_all.csv')
+new_train_path = 'train_data/train_data_new1.csv'
+test_path = 'test_data/test_data_new1.csv'
+create_test_set(train_data, new_train_path, test_path)
+
+
+
+"""
+f_1 = load_csv_data('train_data/attack_flow_table_dif_proto.csv')
+f_2 = load_csv_data('train_data/attack_flow_table_same_proto.csv')
+f_3 = load_csv_data('train_data/normal_flow_table_all.csv')
+f_4 = load_csv_data('train_data/train_flow_table.csv')
+
+c_1 = combine_flow_tables(f_1, f_3)
+c_2 = combine_flow_tables(f_2, f_4)
+c_all = combine_flow_tables(c_1, c_2)
+
+store_flow_table(c_1, 'train_data/train_data_all.csv', 1)
+
 
 #train_data
 flow_table_1_bad = pd.read_csv('data/flow_table_1_bad.csv')
@@ -52,3 +95,4 @@ combined_flow_table.head()
 combined_flow_table_test.head()
 combined_flow_table_test_2.head()
 combined_all.head()
+"""

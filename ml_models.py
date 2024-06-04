@@ -34,9 +34,32 @@ def preprocessing_stats(train, test):
 
     return data_train, data_test, label_train, label_test, feature_names
 
-def apply_model(data_train, data_test, label_train, label_test, model_type, feature_names):
+# it takes history_batch and returns data_train, data_test, label_train, label_test
+def preprocessing_batches(train, test):
+    # Drop non-numeric columns
+    data_train = train.drop(columns=['timestamp', 'flow_table_stats', 'removed_table_stats', 'flow_table_stats_durations', 'removed_table_stats_durations', 'is_attack'])
+    label_train = train['is_attack']
+
+    feature_names = data_train.columns
+    
+    data_test = test.drop(columns=['is_attack'])
+    label_test = test['is_attack']
+
+
+    # Standardizing the data
+    scaler = StandardScaler()
+    data_train = scaler.fit_transform(data_train)
+    data_test = scaler.transform(data_test)
+
+    return data_train, data_test, label_train, label_test, feature_names
+
+def apply_model(data_train, data_test, label_train, label_test, model_type, feature_names, is_batch):
     model = None
-    model_filename = f"ml_models/{model_type.name.lower()}_model.pkl"
+    model_filename = ""
+    if (is_batch):
+        model_filename = f"history_batches_ml_models/{model_type.name.lower()}_model.pkl"
+    else:
+        model_filename = f"flow_rules_ml_models/{model_type.name.lower()}_model.pkl"
     
     # Check if the model file exists, if not, train and save the model
     try:
@@ -90,13 +113,23 @@ def feature_importance(model_type, model, feature_names):
         print(model_type.name + " Feature Importance:\n", feature_importance)
 
 # it creates model stats
-def create_model_stats(train, test):
-    data_train, data_test, label_train, label_test, feature_names = preprocessing_stats(train, test)
-    apply_model(data_train, data_test, label_train, label_test, ML_Model.KNN, feature_names)
-    apply_model(data_train, data_test, label_train, label_test, ML_Model.RANDOM_FOREST, feature_names)
-    apply_model(data_train, data_test, label_train, label_test, ML_Model.SVM, feature_names)
-    apply_model(data_train, data_test, label_train, label_test, ML_Model.XGBOOST, feature_names)
+def create_model_stats(train, test, is_batch):
+    print("Run ML models for history_batches? " + str(is_batch))
+    data_train, data_test, label_train, label_test, feature_names = None, None, None, None, None
+    if (is_batch):
+        data_train, data_test, label_train, label_test, feature_names = preprocessing_batches(train, test)
+    else:
+        data_train, data_test, label_train, label_test, feature_names = preprocessing_stats(train, test)
+    apply_model(data_train, data_test, label_train, label_test, ML_Model.KNN, feature_names, is_batch)
+    apply_model(data_train, data_test, label_train, label_test, ML_Model.RANDOM_FOREST, feature_names, is_batch)
+    apply_model(data_train, data_test, label_train, label_test, ML_Model.SVM, feature_names, is_batch)
+    apply_model(data_train, data_test, label_train, label_test, ML_Model.XGBOOST, feature_names, is_batch)
 
-train_data = pd.read_csv('data/train_flow_table.csv')
-test_data = pd.read_csv('data/test_flow_table.csv')
-create_model_stats(train_data, test_data)
+
+
+is_batch = False
+test_path = 'test_data/test_data_new1.csv'
+train_path = 'train_data/train_data_new1.csv'
+train_data = pd.read_csv(train_path)
+test_data = pd.read_csv(test_path)
+create_model_stats(train_data, test_data, is_batch)

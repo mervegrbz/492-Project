@@ -3,4 +3,5 @@
 #**.csv
 **.html.**
 **.txt
+/data
 #**.ipynb
