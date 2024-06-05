@@ -4,18 +4,29 @@ from sklearn.model_selection import train_test_split
 
 
 
-# Load the CSV files
+# Load the CSV files by dropping index
 def load_csv_data(file_path):
-    return pd.read_csv(file_path)
+    df = pd.read_csv(file_path, index_col=False)
+    # Drop any unnamed columns
+    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+    return df
 
+# concating two flow tables
 def combine_flow_tables(flow_table_1, flow_table_2):
     return pd.concat([flow_table_1, flow_table_2], ignore_index=True)
 
+# labeling them when storing
 def store_flow_table(flow_table, stored_path, is_attack):
-    #flow_table['is_attack'] = is_attack
+    flow_table['is_attack'] = is_attack
     flow_table.to_csv(stored_path, index=False)
     flow_table.head()
 
+# with no label
+def store_flow_table(flow_table, stored_path):
+    flow_table.to_csv(stored_path, index=False)
+    flow_table.head()
+
+# creating test set from training data
 def create_test_set(train_data, new_train_path, test_path):
     # Split the data into training and test sets
     train_set, test_set = train_test_split(train_data, test_size=0.2, random_state=42)
@@ -24,26 +35,61 @@ def create_test_set(train_data, new_train_path, test_path):
     # Optionally, save the new training set to a CSV file
     train_set.to_csv(new_train_path, index=False)
 
+# shuffling the table
+def shuffle_table(stored_path):
+    flow_table = load_csv_data(stored_path)
+    flow_table_shuffled = flow_table.sample(frac=1, random_state=42).reset_index(drop=True)
+    # flow_table_shuffled['is_attack'] = is_attack
+    flow_table_shuffled.to_csv(stored_path, index=False)
 
-train_data = load_csv_data('train_data/train_data_all.csv')
-new_train_path = 'train_data/train_data_new1.csv'
-test_path = 'test_data/test_data_new1.csv'
-create_test_set(train_data, new_train_path, test_path)
+# drop column from data
+def drop_col(col, path):
+    flows = load_csv_data(path)
+    flow_new = flows.drop(columns=[col])
+    store_flow_table(flow_new, path)
 
 
 
+""" Combine 2 flows
+#shuffle_table('train_data/train_data_combined_3.csv')
+drop_col('match','train_data/train_data_new3.csv')
+
+f_1 = load_csv_data('train_data/train_data_atak.csv')
+f_2 = load_csv_data('train_data/train_data_combined.csv')
+c_all = combine_flow_tables(f_1, f_2)
+
+store_flow_table(c_all, 'train_data/train_data_combined_2.csv', 1)
 """
-f_1 = load_csv_data('train_data/attack_flow_table_dif_proto.csv')
-f_2 = load_csv_data('train_data/attack_flow_table_same_proto.csv')
-f_3 = load_csv_data('train_data/normal_flow_table_all.csv')
-f_4 = load_csv_data('train_data/train_flow_table.csv')
+
+""" Combine 4 flows
+f_1 = load_csv_data('data/full-health/flow_table_1.csv')
+f_2 = load_csv_data('data/full-health/flow_table_2.csv')
+f_3 = load_csv_data('data/full-health/flow_table_3.csv')
+f_4 = load_csv_data('data/full-health/flow_table_4.csv')
 
 c_1 = combine_flow_tables(f_1, f_3)
 c_2 = combine_flow_tables(f_2, f_4)
 c_all = combine_flow_tables(c_1, c_2)
 
-store_flow_table(c_1, 'train_data/train_data_all.csv', 1)
+store_flow_table(c_all, 'train_data/train_data_new2.csv', 0)
+"""
 
+""" Test Set
+train_data = load_csv_data('train_data/train_data_combined_3.csv')
+new_train_path = 'train_data/train_test_1.csv' #test set from train
+test_path = 'test_data/test_train_1.csv' #test set from train
+create_test_set(train_data, new_train_path, test_path)
+"""
+
+"""
+f_1 = load_csv_data('train_data/train_data_new3.csv')
+f_2 = load_csv_data('train_data/train_data_combined_2.csv')
+c_1 = combine_flow_tables(f_1, f_2)
+store_flow_table(c_1, 'train_data/train_data_combined_3.csv')
+"""
+
+
+"""
 
 #train_data
 flow_table_1_bad = pd.read_csv('data/flow_table_1_bad.csv')

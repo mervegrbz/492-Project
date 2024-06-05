@@ -6,7 +6,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 import xgboost as xgb
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score, mean_squared_error
 from enum import Enum
 import time
 import pickle
@@ -87,29 +87,38 @@ def apply_model(data_train, data_test, label_train, label_test, model_type, feat
 
     prediction = model.predict(data_test)
     print(model_type.name + " Accuracy:", accuracy_score(label_test, prediction))
+    f1 = f1_score(label_test, prediction, average='weighted')  # You can change 'weighted' to 'macro' or 'micro' as needed
+    print(model_type.name + " F1 Score:", f1)
+    rmse = np.sqrt(mean_squared_error(label_test, prediction))
+    print(model_type.name + " RMSE:", rmse)
     print(classification_report(label_test, prediction))
     print(model_type.name + " Confusion Matrix:\n", confusion_matrix(label_test, prediction))
     
     feature_importance(model_type, model, feature_names)
 
 def feature_importance(model_type, model, feature_names):
+    feature_importance = None
+    output_file = f"feature_importance/{model_type.name.lower()}_model.csv"
+    
     # Feature importance for Random Forest
     if model_type == ML_Model.RANDOM_FOREST:
         importances = model.feature_importances_
         feature_importance = pd.Series(importances, index=feature_names).sort_values(ascending=False)
-        print(model_type.name + " Feature Importance:\n", feature_importance)
 
     # Feature importance for SVM
     if model_type == ML_Model.SVM:
         if model.kernel == 'linear':
             importances = np.abs(model.coef_[0])
             feature_importance = pd.Series(importances, index=feature_names).sort_values(ascending=False)
-            print(model_type.name + " Feature Importance:\n", feature_importance)
 
     # Feature importance for XGBoost
     if model_type == ML_Model.XGBOOST:
         importances = model.feature_importances_
         feature_importance = pd.Series(importances, index=feature_names).sort_values(ascending=False)
+
+    if feature_importance is not None:
+        # Save feature importances to CSV
+        feature_importance.to_csv(output_file, header=True)
         print(model_type.name + " Feature Importance:\n", feature_importance)
 
 # it creates model stats
@@ -206,9 +215,9 @@ def preprocessing_batches_no_label(train, test):
     return data_train, data_test, label_train, feature_names
 
 is_batch = False
-test_path = 'test_data/test_data_new1.csv'
-train_path = 'train_data/train_data_new1.csv'
+train_path = 'train_data/train_test_1.csv' #test set from train
+test_path = 'test_data/test_train_1.csv' #test set from train
 train_data = pd.read_csv(train_path)
 test_data = pd.read_csv(test_path)
-applied_model(test_data,  ML_Model.SVM, is_batch)
+create_model_stats(train_data, test_data, is_batch)
 #create_model_stats(train_data, test_data, is_batch)
