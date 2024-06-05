@@ -45,8 +45,8 @@ def run_real_data(topo):
 def delayed_detection(malicious, hosts):
     ### important parameter
     sleep(2)
-
-    malicious.attack_protocol_change(1, 60 ,hosts, 10)
+    print('attackkk')
+    malicious.attack_protocol_change(3, 60 ,hosts, 10)
     
 if __name__ == '__main__':
     arguments = sys.argv

@@ -16,7 +16,7 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 
 				super(SimpleMonitor13, self).__init__(*args, **kwargs)
 				self.datapaths = {}
-				self.model = get_model(ML_Model.KNN, False)
+			
 				self.monitor_thread = hub.spawn(self._monitor)
 
 		@set_ev_cls(ofp_event.EventOFPStateChange,
@@ -55,9 +55,10 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 
 				req = parser.OFPFlowStatsRequest(datapath)
 				datapath.send_msg(req)
-		def predict(self, flow):
-				prediction = self.model.predict(flow)
-				return prediction
+		def predict(self, model_type, flow_table):
+				model = get_model(model_type, flow_table, False)
+				# predict_test_data_individually(model, ) 
+				return model
 		@set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
 		def _flow_stats_reply_handler(self, ev):
 				timestamp = datetime.now()
@@ -92,6 +93,7 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 					flow_rules.loc[len(flow_rules)] = row
 
 				flow_ml = ml_flow(flow_rules)
+				flow_ml['is_attack'] = 0
 				## get the suspected flows
 				# flow_rules = flow_labeller(flow_rules)
 				# suspected_flows = flow_rules[flow_rules['label'] == 1]
@@ -103,12 +105,9 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 				removed_flow_average_duration = related_batch['removed_flow_average_duration'].mean()
 				removed_flow_byte_per_packet = related_batch['removed_flow_byte_per_packet'].mean() # the second important feature to distunguish mice and elephant
 				removed_average_byte_per_sec = related_batch['removed_average_byte_per_sec'].mean() # the most important to distunguish
-				for index, flow in flow_ml.iterrows():
-					flow_reshaped = flow.values.reshape(1, -1)
-					print(flow_reshaped)
-					print('---------------------------------------------')
-					res = self.predict(flow_reshaped)
-					print(res)
+				self.predict(ML_Model.KNN, flow_ml)
+    
+
     
 				for index, flow in flow_ml.iterrows():
 					if flow['bps'] < BYTE_PER_SEC_BLACK_LIST * removed_average_byte_per_sec and flow['bpp'] < BYTE_PER_PACKET_BLACK_LIST * removed_flow_byte_per_packet:

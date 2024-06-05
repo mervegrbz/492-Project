@@ -21,7 +21,6 @@ def write_logs(batch_number, logs):
 		with open(filename, mode='w') as file:
 				for log in logs:
 						file.write(str(log) + '\n')
-
 def get_flow_number():
 	global flow_number
 	flow_number += 1 
@@ -76,14 +75,14 @@ class SimpleSwitch13(app_manager.RyuApp):
 			inst = [ofp_parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS, actions)]
 			mod = None
 			cookie_num = get_flow_number()
-			#in_port = match['in_port'] doesn't work because of L4 we need to consider
 			if (buffer_id):
 				mod = ofp_parser.OFPFlowMod(datapath, cookie=cookie_num,cookie_mask=0xFFFFFFFFFFFFFFFF, table_id=0, command=ofp.OFPFC_ADD,
 																		idle_timeout=idle_timeout, hard_timeout=0,priority=priority, buffer_id=buffer_id,
 																		out_port=ofp.OFPP_ANY, out_group=ofp.OFPG_ANY, flags=ofp.OFPFF_SEND_FLOW_REM,
 																		match=match, instructions=inst)
 			else:
-				mod = ofp_parser.OFPFlowMod(datapath, cookie=cookie_num, cookie_mask=0xFFFFFFFFFFFFFFFF, table_id=0, command=ofp.OFPFC_ADD, idle_timeout=idle_timeout, hard_timeout=0,
+				mod = ofp_parser.OFPFlowMod(datapath, cookie=cookie_num, cookie_mask=0xFFFFFFFFFFFFFFFF, table_id=0, command=ofp.OFPFC_ADD, 
+                                    idle_timeout=idle_timeout, hard_timeout=0,
 																		priority=priority, out_port=ofp.OFPP_ANY, out_group=ofp.OFPG_ANY,
 																		flags=ofp.OFPFF_SEND_FLOW_REM, match=match, instructions=inst)
 
@@ -109,11 +108,11 @@ class SimpleSwitch13(app_manager.RyuApp):
 		parser = datapath.ofproto_parser
 		inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
 		mod = None
-		cookie_num = get_flow_number()
+
 		if buffer_id:
-			mod = parser.OFPFlowMod(datapath=datapath, cookie=cookie_num, cookie_mask=0xFFFFFFFFFFFFFFFF, buffer_id=buffer_id, flags=ofproto.OFPFF_SEND_FLOW_REM, priority=priority, match=match, instructions=inst, hard_timeout = hard_time)
+			mod = parser.OFPFlowMod(datapath=datapath, cookie=1, cookie_mask=0xFFFFFFFFFFFFFFFF, buffer_id=buffer_id, flags=ofproto.OFPFF_SEND_FLOW_REM, priority=priority, match=match, instructions=inst, hard_timeout = hard_time)
 		else:
-			mod = parser.OFPFlowMod(datapath=datapath, cookie=cookie_num, cookie_mask=0xFFFFFFFFFFFFFFFF, priority=priority, flags=ofproto.OFPFF_SEND_FLOW_REM, match=match, instructions=inst, hard_timeout = hard_time)
+			mod = parser.OFPFlowMod(datapath=datapath, cookie=1, cookie_mask=0xFFFFFFFFFFFFFFFF, priority=priority, flags=ofproto.OFPFF_SEND_FLOW_REM, match=match, instructions=inst, hard_timeout = hard_time)
 		
 		flow_mod = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id, 'match': format_match(mod.match), 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags, 'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout, 'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port }
 		flow_list.append(flow_mod)
@@ -222,7 +221,6 @@ class SimpleSwitch13(app_manager.RyuApp):
 					match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=srcip, ipv4_dst=dstip, ip_proto=protocol, udp_src=u.src_port, udp_dst=u.dst_port,)
 
 				if msg.buffer_id != ofproto.OFP_NO_BUFFER:
-					self.logger.info(datapath)
 					self.send_flow_mod(datapath, timestamp, match, actions, 1, msg.buffer_id)
 					return
 				else:

@@ -8,8 +8,7 @@ from predictor import *
 from parameters import *
 from apscheduler.schedulers.background import BackgroundScheduler
 from flow_inspector import ml_flow
-import logging
-logging.getLogger('schedule').propagate = False
+
 # we may arrange it w.r.t official document https://ryu.readthedocs.io/en/latest/ofproto_v1_3_ref.html command enumaration
 '''
 OFPFC_ADD
@@ -53,9 +52,14 @@ class Switch:
              'flow_table_stats', 'flow_table_stats_durations' 'removed_table_stats', 'removed_table_stats_durations', 'is_attack']
     self.history_batches = pd.DataFrame(columns=columns)  
     self.flow_rules = pd.DataFrame(columns=['ipv4_src','ipv4_dst','port_src','port_dst','ip_proto', 'cookie', 'duration_sec', 'byte_count', 'packet_count', 'match'])
+    import logging
+    logging.getLogger('schedule').propagate = False
     self.scheduler = BackgroundScheduler()
-    self.scheduler.add_job(self.flow_table_stats, 'interval', seconds=5)
+    # self.scheduler.add_job(self.flow_table_stats, 'interval', seconds=5)
+    self.scheduler.add_job(self.can_kodu, 'interval', seconds=1)
+    logging.getLogger('apscheduler.executors.default').setLevel(logging.CRITICAL)
     self.scheduler.start()
+    
 
   # this function calculates the flow's occupancy rate, if it is more than threshold -> it will add its time into the overload_timestamps
   # returns the occupancy rate of the switch
@@ -66,7 +70,8 @@ class Switch:
       self.overload_timestamps.append(overload_time)
       # print("Switch %s is overloaded" % self.datapath_id)
     return used_capacity / self.capacity
-
+  def can_kodu(self):
+    print(f'{len(self.flow_table)=}')
   # this function calculates the statistics from removed flows. 
   # it calculates and returns flow_average_duration, flow_average_byte_per_packet, average_byte_per_sec
   def calc_removed_flows(self):
@@ -99,26 +104,32 @@ class Switch:
       self.append_flow_rules(current_flow, operation)
 
     elif operation == FLOW_OPERATION.DELETE:
+      found = True
       for flow in self.flow_table:
-        if flow['match'] == current_flow['match']:
+        if flow['cookie'] == current_flow['cookie']:
+          found = False
           self.append_flow_rules(current_flow, operation)
           self.flow_table.remove(flow)
           # if flow removed not because of mitigation, append it to flow_removed list to use it later as a normal removed flows
           self.flow_removed.append(current_flow)
-
+      if found:
+        print(f'{flow["cookie"]=} BU NEDEN GITMEDI {self.datapath_id=}')
+        
 
   def append_flow_rules(self, flow, operation):
     _flow = {}
     ## switch supports only three protocols for now	mininet
   
     if(operation == FLOW_OPERATION.DELETE):
-      row_index = self.flow_rules.loc[self.flow_rules['match'] == flow['match']].index[0]
-      print('succesfully deleted')
+      row_index = self.flow_rules.loc[self.flow_rules['cookie'] == flow['cookie']].index[0]
+
       ## find the flow rule in the flow_rules and insert the duration_sec, byte_count, packet_count
       self.flow_rules.loc[row_index, 'duration_sec'] = flow['duration_sec']
       self.flow_rules.loc[row_index, 'byte_count'] = flow['byte_count']
       self.flow_rules.loc[row_index, 'packet_count'] = flow['packet_count']
+      print(f'deleted {flow["cookie"]=} {self.datapath_id=}')
     if (operation == FLOW_OPERATION.ADD):
+      print(f'add: {flow["cookie"]=} {self.datapath_id=}')
       if (flow['match']['ip_proto'] == 6):
         _flow = {'ipv4_src': flow['match']['ipv4_src'], 'ipv4_dst': flow['match']['ipv4_dst'], 'port_src': flow['match']['tcp_src'], 'port_dst': flow['match']['tcp_dst'], 'ip_proto': flow['match']['ip_proto'], 'cookie': flow['cookie'], 'duration_sec': 0, 'byte_count': 0, 'packet_count': 0, 'match':flow['match']}
       if (flow['match']['ip_proto'] == 17):
@@ -157,7 +168,7 @@ class Switch:
     ip_proto = []
     ip_src = []
     ip_dst = []
-    
+    return [] , []
     # if is removed, we need to check duration_sec
     if (isRemoved):
       ip_proto  = [(i['match']['ip_proto'],i['duration_sec']) for i in table if 'ip_proto' in i['match']]
