@@ -86,6 +86,7 @@ def apply_model(data_train, data_test, label_train, label_test, model_type, feat
         print(model_type.name + " training time: " + str(time.time() - start_time))
 
     prediction = model.predict(data_test)
+    print(model_type.name + " Prediction:", prediction)
     print(model_type.name + " Accuracy:", accuracy_score(label_test, prediction))
     f1 = f1_score(label_test, prediction, average='weighted')  # You can change 'weighted' to 'macro' or 'micro' as needed
     print(model_type.name + " F1 Score:", f1)
