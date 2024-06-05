@@ -24,17 +24,26 @@ def preprocessing_batches(data):
     data_train = scaler.fit_transform(data)
     return data_train, label_train
 
-def preprocessing_stats(data):
-    # Drop non-numeric columns
-    # if is_attack column exists in the data_test, drop it
-    label_train = data['is_attack']
-    data = data.drop(columns=['is_attack'])
-    print("Train Columns:")
-    print(data.columns)
-    return data, label_train
-# it creates model stats
 
-def get_model(model_type, is_batch):
+def preprocessing_stats(train, test):
+    # Preprocessing
+    data_train = train.drop(columns=['is_attack'])
+    label_train = train['is_attack']
+    
+    feature_names = data_train.columns
+
+    data_test = test.drop(columns=['is_attack'])
+    label_test = test['is_attack']
+
+    # Standardizing the data
+    scaler = StandardScaler()
+    data_train = scaler.fit_transform(data_train)
+    data_test = scaler.transform(data_test)
+
+    return data_train, data_test, label_train, label_test, feature_names
+
+
+def get_model(model_type, test_data, is_batch):
     model = None
     model_filename = ""
     if (is_batch):
@@ -64,11 +73,12 @@ def get_model(model_type, is_batch):
         data_train, label_train = None, None
         if (is_batch):
             #data_train, data_test_2, label_train, feature_names = preprocessing_batches_no_label(train_data, data_test)
-            data_train, label_train = preprocessing_batches(train_data)
+            data_train, data_test, label_train, label_test, feature_names = preprocessing_batches(train_data, test_data)
         else:
             #TODO call the commented one if your data has no label
             # data_train, data_test, label_train, feature_names = preprocessing_stats_no_label(train_data, data_test)
-            data_train, label_train = preprocessing_stats(train_data)
+            data_train, data_test, label_train, label_test, feature_names = preprocessing_stats(train_data, test_data)
+
         model.fit(data_train, label_train)
         print('model hazir')
         with open(model_filename, 'wb') as file:
@@ -100,31 +110,16 @@ def predict_test_data_individually(model, test_data, test_label, feature_names):
     
     return predictions
 
-def preprocessing_stats(train, test):
-    # Preprocessing
-    data_train = train.drop(columns=['is_attack'])
-    label_train = train['is_attack']
-    
-    feature_names = data_train.columns
 
-    data_test = test.drop(columns=['is_attack'])
-    label_test = test['is_attack']
-
-    # Standardizing the data
-    scaler = StandardScaler()
-    data_train = scaler.fit_transform(data_train)
-    data_test = scaler.transform(data_test)
-
-    return data_train, data_test, label_train, label_test, feature_names
 
 # Example usage
-model_type = ML_Model.RANDOM_FOREST
-model = get_model(model_type, False)
-
 train_path = 'train_data/train_test_1.csv'
 test_path = 'test_data/test_train_1.csv'
 test_data = pd.read_csv(test_path)
 train_data = pd.read_csv(train_path)
+model_type = ML_Model.SVM
+model = get_model(model_type, test_data, False)
+
 data_train, data_test, label_train, label_test, feature_names = preprocessing_stats(train_data, test_data)
 predicted_data = predict_test_data_individually(model, data_test, label_test, feature_names)
 
