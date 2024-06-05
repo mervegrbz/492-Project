@@ -5,17 +5,18 @@ from ryu.lib import hub
 import predictor
 import controller
 from datetime import datetime
-import pickle,os
 import pandas as pd
 from parameters import *
 from flow_inspector import ml_flow
 from detector import flow_labeller
+from ml_models import get_model, ML_Model
 class SimpleMonitor13(controller.SimpleSwitch13):
 
 		def __init__(self, *args, **kwargs):
 
 				super(SimpleMonitor13, self).__init__(*args, **kwargs)
 				self.datapaths = {}
+				self.model = get_model(ML_Model.KNN, False)
 				self.monitor_thread = hub.spawn(self._monitor)
 
 		@set_ev_cls(ofp_event.EventOFPStateChange,
@@ -39,12 +40,12 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 					for dp in self.datapaths.values():
 						## TODO eger capacity cok yuksek degilse mitigation icin 3 stat daha beklenir burada capacity kontrol bir daha yapalim stat atmadan once eger azsa biraz bekleyelim
 						self._request_stats(dp)
-						predictor.LOW_RATE_FLAG = False
 				if predictor.HIGH_RATE_FLAG:
 					for dp in self.datapaths.values():
 						# TODO no need to request stats in high rate, at first drop the newly appended flows
 						self._request_stats(dp)
-						predictor.LOW_RATE_FLAG = False
+				predictor.LOW_RATE_FLAG = False
+				predictor.LOW_RATE_FLAG = False
 				hub.sleep(5)
 
 
@@ -54,7 +55,9 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 
 				req = parser.OFPFlowStatsRequest(datapath)
 				datapath.send_msg(req)
-
+		def predict(self, flow):
+				prediction = self.model.predict(flow)
+				return prediction
 		@set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
 		def _flow_stats_reply_handler(self, ev):
 				timestamp = datetime.now()
@@ -88,20 +91,26 @@ class SimpleMonitor13(controller.SimpleSwitch13):
 					row = pd.Series([ip_src, ip_dst, tp_src, tp_dst, ip_proto, stat.cookie, stat.duration_sec, stat.byte_count, stat.packet_count], index=flow_rules.columns)
 					flow_rules.loc[len(flow_rules)] = row
 
-				flow_rules = ml_flow(flow_rules)
+				flow_ml = ml_flow(flow_rules)
 				## get the suspected flows
 				# flow_rules = flow_labeller(flow_rules)
 				# suspected_flows = flow_rules[flow_rules['label'] == 1]
+
 				switch = self.switch_list[ev.msg.datapath.id]
 				# switch has the history batches of flow statistics get the related columns and compare it with current flow to understand whether it is suspected or not
 				related_batch = switch.get_related_batch(num_of_batch=5)
-				
+	
 				removed_flow_average_duration = related_batch['removed_flow_average_duration'].mean()
 				removed_flow_byte_per_packet = related_batch['removed_flow_byte_per_packet'].mean() # the second important feature to distunguish mice and elephant
 				removed_average_byte_per_sec = related_batch['removed_average_byte_per_sec'].mean() # the most important to distunguish
-				
+				for index, flow in flow_ml.iterrows():
+					flow_reshaped = flow.values.reshape(1, -1)
+					print(flow_reshaped)
+					print('---------------------------------------------')
+					res = self.predict(flow_reshaped)
+					print(res)
     
-				for index, flow in flow_rules.iterrows():
+				for index, flow in flow_ml.iterrows():
 					if flow['bps'] < BYTE_PER_SEC_BLACK_LIST * removed_average_byte_per_sec and flow['bpp'] < BYTE_PER_PACKET_BLACK_LIST * removed_flow_byte_per_packet:
 						self.add_banned_list(flow)
 						# self.drop_flow(datapath, flow['cookie'])

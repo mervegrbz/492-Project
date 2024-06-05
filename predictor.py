@@ -48,10 +48,8 @@ def check_high_rate_attack(data):
     packet_in_rate_last_row = packet_in_rates.iloc[-1]
     if (packet_in_rate_last_row > abs(packet_in_rates.mean() * HIGH_RATE_THRESHOLD)):
         print("High Rate Attack Detected")
-        print(packet_in_rates)
         return True
     return False
-
 
 def get_entropy(data):
     data = data.dropna()
@@ -61,33 +59,22 @@ def get_entropy(data):
 def check_flow_durations(data):    
     mean_removed = data['removed_flow_average_duration'].mean()
     average_flow_duration_on_table_last_row = data['average_flow_duration_on_table'].iloc[-1]
-    if (average_flow_duration_on_table_last_row - mean_removed  > DURATION_THRESHOLD and mean_removed > IDLE_TIMEOUT):
+    if (average_flow_duration_on_table_last_row - mean_removed  > DURATION_THRESHOLD):
         print("Low Rate Attack Detected because of flow durations")
         return True
     return False
 
-
-# in general attack, if last two batch is more than high rate threshold it triggers high rate attack else low rate
-def check_general_attack_is_high_rate(data):
-    packet_in_rates = data['packet_in_rate'].diff()
-    packet_in_rate_last_two_rows = packet_in_rates.iloc[-1]
-    if len(packet_in_rates) > 2:
-        packet_in_rate_last_two_rows += packet_in_rates.iloc[-2]
-    else:
-        return True   
-    if (packet_in_rate_last_two_rows > packet_in_rates.mean() * HIGH_RATE_THRESHOLD):
-        return True
-    return False
         
 # it checks whether there is an attack after it takes history batches        
 def check_attack(data):
     global LOW_RATE_FLAG, HIGH_RATE_FLAG
-
     capacity_last_row = data['capacity_used'].iloc[-1]
     if (capacity_last_row > CAPACITY_THRESHOLD):
-        if check_general_attack_is_high_rate(data):
+        if check_high_rate_attack(data):
+            print('High rate due to capacity usage')
             HIGH_RATE_FLAG = True
         else:
+            print('Low rate due to capacity usage')
             LOW_RATE_FLAG = True
 
     if (len(data) < 5 ):

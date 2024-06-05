@@ -117,7 +117,6 @@ class SimpleSwitch13(app_manager.RyuApp):
 		
 		flow_mod = {'type': 'FLOWMOD', 'timestamp': timestamp, 'datapath_id': datapath.id, 'match': format_match(mod.match), 'cookie': mod.cookie, 'command': mod.command, 'flags': mod.flags, 'idle_timeout': mod.idle_timeout, 'hard_timeout': mod.hard_timeout, 'priority': mod.priority, 'buffer_id': mod.buffer_id, 'out_port': mod.out_port }
 		flow_list.append(flow_mod)
-		switch = self.switch_list[datapath.id]
 		datapath.send_msg(mod)
 	
 	## Function adds a empty action that implies the dropping the packets coming from related ip_src
@@ -153,6 +152,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 	# When packet_in async messages comes from switch to the controller, it will trigger this function
 	@set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
 	def _packet_in_handler(self, ev):
+		# print('packet_in')
 		global flow_list
 		if ev.msg.msg_len < ev.msg.total_len:
 			self.logger.debug("packet truncated: only %s of %s bytes", ev.msg.msg_len, ev.msg.total_len)
@@ -184,6 +184,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 		# packet_in_flow = {'type': 'PACKETIN', 'timestamp': timestamp, 'datapath_id': datapath_id, 'in_port': in_port, 'reason': reason, 'eth_src': eth.src, 'eth_dst': eth.dst}
 		#flow_list.append(packet_in_flow)
 		#switch.packet_ins.append(packet_in_flow)
+		# print({'type': 'PACKETIN', 'timestamp': timestamp, 'datapath_id': datapath_id, 'in_port': in_port, 'reason': reason, 'eth_src': eth.src, 'eth_dst': eth.dst})
 		if eth.ethertype == ether_types.ETH_TYPE_LLDP:
 			return
 		dst = eth.dst
@@ -209,6 +210,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 				srcip = ip.src
 				dstip = ip.dst
 				protocol = ip.proto
+	
 				if protocol == in_proto.IPPROTO_ICMP:
 					t = pkt.get_protocol(icmp.icmp)
 					match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=srcip, ipv4_dst=dstip, ip_proto=protocol, icmpv4_code=t.code, icmpv4_type=t.type)		

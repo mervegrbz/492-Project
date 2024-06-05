@@ -15,8 +15,8 @@ class MininetTopo():
             Linear = LinearTopo(number_of_switch, number_of_host_per_switch)
             self.net = Mininet(topo=Linear, controller=RemoteController)
         elif topology == 'tree':
-            TreeTopo = TreeTopo(number_of_switch, number_of_host_per_switch)
-            self.net = Mininet(topo=TreeTopo, controller=RemoteController)
+            Tree = TreeTopo(number_of_switch, number_of_host_per_switch)
+            self.net = Mininet(topo=Tree, controller=RemoteController)
         else:
             print('Invalid topology')
             sys.exit(1)
@@ -27,6 +27,7 @@ class MininetTopo():
         
     def config_switch(self):
         for switch in self.net.switches:
+            print(switch)
             self.master_node.cmdPrint('ovs-vsctl set bridge %s protocols=OpenFlow13' %switch)
             self.master_node.cmdPrint(f'ovs-vsctl -- --id=@{switch} create Flow_Table flow_limit={TABLE_CAPACITY} overflow_policy=refuse -- set Bridge {switch} flow_tables=0=@{switch}')
     def pingAll(self):
@@ -39,13 +40,13 @@ def run_real_data(topo):
     hosts = topo.net.hosts
     for host in hosts:
         interface = host.intf()
-        print(interface)
+
         host.cmd(f'tcpreplay -i  {interface}  -tK univ1_pt1 ')
-def delayed_detection(malicious ):
+def delayed_detection(malicious, hosts):
     ### important parameter
-    sleep(3)
-    print('attack')
-    malicious.attack_protocol_change(5, 60 ,number_of_host_per_switch*number_of_switch, 5)
+    sleep(2)
+
+    malicious.attack_protocol_change(1, 60 ,hosts, 10)
     
 if __name__ == '__main__':
     arguments = sys.argv
@@ -66,7 +67,7 @@ if __name__ == '__main__':
         from threading import Thread
         malicious = attack_sim.malicious_host('h1s1',host,10)
         benign_thread = Thread(target=benign_traffic.traffic, args=(topo.net, number_of_host_per_switch*number_of_switch))
-        malicious_thread = Thread(target=delayed_detection, args=(malicious,))
+        malicious_thread = Thread(target=delayed_detection, args=(malicious, number_of_host_per_switch*number_of_switch,))
         # benign_thread.start()
         
         malicious_thread.start()
